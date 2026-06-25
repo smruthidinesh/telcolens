@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TelcoLens — Agentic RAG Analyst</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  body { background:#0a0e16; }
+  .card { background:#111726; border:1px solid #1e2940; }
+  .pill { background:#161f33; border:1px solid #28344e; }
+  .scroll::-webkit-scrollbar { width:8px; }
+  .scroll::-webkit-scrollbar-thumb { background:#28344e; border-radius:8px; }
+  .step.active { color:#a5b4fc; border-color:#6366f1; }
+  .step.done { color:#6ee7b7; border-color:#10b981; }
+  .drawer { transition: transform .25s ease; }
+</style>
+</head>
+<body class="text-slate-200 h-screen overflow-hidden">
+<div class="flex h-full">
+
+  <!-- Sidebar -->
+  <aside class="w-64 shrink-0 border-r border-[#1e2940] flex flex-col bg-[#0c111c]">
+    <div class="p-4 border-b border-[#1e2940]">
+      <div class="text-lg font-semibold text-white">TelcoLens</div>
+      <div class="text-[11px] text-slate-500">agentic RAG · telecom &amp; SaaS</div>
+    </div>
+    <div class="p-3">
+      <button id="newChat" class="w-full bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium py-2 rounded-lg">+ New chat</button>
+    </div>
+    <div id="convos" class="flex-1 overflow-y-auto scroll px-2 space-y-1"></div>
+    <div id="status" class="p-3 text-[11px] text-slate-500 border-t border-[#1e2940]"></div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 flex flex-col min-w-0">
+    <header class="h-14 shrink-0 border-b border-[#1e2940] flex items-center justify-between px-5">
+      <div id="convoTitle" class="text-sm text-slate-300 truncate">New chat</div>
+      <div class="flex items-center gap-2">
+        <button id="openCharts" class="pill rounded-lg px-3 py-1.5 text-xs text-slate-300 hover:text-white">📈 Charts</button>
+        <button id="openMetrics" class="pill rounded-lg px-3 py-1.5 text-xs text-slate-300 hover:text-white">📊 Monitoring</button>
+        <button id="toggleDocs" class="pill rounded-lg px-3 py-1.5 text-xs text-slate-300 hover:text-white">📄 Documents</button>
+      </div>
+    </header>
+
+    <div id="messages" class="flex-1 overflow-y-auto scroll px-5 py-6 space-y-5"></div>
+
+    <!-- pipeline -->
+    <div id="pipeline" class="px-5 pb-2 hidden">
+      <div class="flex items-center gap-2 text-[11px]">
+        <span class="text-slate-500">pipeline:</span>
+        <span class="step border rounded px-2 py-0.5 border-[#28344e] text-slate-500" data-s="route">route</span>
+        <span class="step border rounded px-2 py-0.5 border-[#28344e] text-slate-500" data-s="retrieve">retrieve</span>
+        <span class="step border rounded px-2 py-0.5 border-[#28344e] text-slate-500" data-s="grade">grade</span>
+        <span class="step border rounded px-2 py-0.5 border-[#28344e] text-slate-500" data-s="generate">generate</span>
+        <span class="step border rounded px-2 py-0.5 border-[#28344e] text-slate-500" data-s="evaluate">evaluate</span>
+      </div>
+    </div>
+
+    <div class="px-5 pb-5">
+      <div class="card rounded-xl p-3">
+        <div id="examples" class="flex flex-wrap gap-2 text-[11px] mb-2"></div>
+        <div class="flex items-end gap-2">
+          <textarea id="q" rows="1" class="flex-1 bg-transparent outline-none resize-none text-slate-100 placeholder:text-slate-500 text-sm"
+            placeholder="Ask about revenue, churn, ARPU, NRR…  (Enter to send)"></textarea>
+          <button id="ask" class="bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium px-4 py-2 rounded-lg">Ask</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Document library drawer -->
+  <aside id="docs" class="drawer w-80 shrink-0 border-l border-[#1e2940] bg-[#0c111c] flex flex-col">
+    <div class="p-4 border-b border-[#1e2940] flex items-center justify-between">
+      <div class="text-sm font-medium text-white">Document library</div>
+      <button id="resetDocs" class="text-[11px] text-rose-300 hover:text-rose-200">reset</button>
+    </div>
+    <div class="p-4">
+      <label id="drop" class="block border-2 border-dashed border-[#28344e] rounded-xl p-6 text-center cursor-pointer hover:border-indigo-500">
+        <div class="text-2xl">⬆️</div>
+        <div class="text-xs text-slate-400 mt-1">Drop a PDF / .txt here<br/>or click to upload</div>
+        <input id="file" type="file" accept=".pdf,.txt,.md" class="hidden" />
+      </label>
+      <div id="uploadMsg" class="text-[11px] text-slate-500 mt-2"></div>
+    </div>
+    <div id="docList" class="flex-1 overflow-y-auto scroll px-4 pb-4 space-y-2"></div>
+  </aside>
+</div>
+
+<!-- Charts modal -->
+<div id="chartsModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="card rounded-2xl p-6 w-[640px] max-w-[94vw]">
+    <div class="flex items-center justify-between mb-4">
+      <div class="text-base font-semibold text-white">📈 Charts <span class="text-[11px] text-slate-500 font-normal">— current vs prior period, extracted from your docs</span></div>
+      <button id="closeCharts" class="text-slate-400 hover:text-white text-sm">✕</button>
+    </div>
+    <div id="chartMetrics" class="flex flex-wrap gap-2 mb-4"></div>
+    <canvas id="chartCanvas" height="220"></canvas>
+    <div id="chartEmpty" class="hidden text-sm text-slate-500 text-center py-10">Upload a document with financial metrics to see charts.</div>
+  </div>
+</div>
+
+<!-- Monitoring modal -->
+<div id="metricsModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="card rounded-2xl p-6 w-[560px] max-w-[92vw]">
+    <div class="flex items-center justify-between mb-4">
+      <div class="text-base font-semibold text-white">📊 Monitoring</div>
+      <button id="closeMetrics" class="text-slate-400 hover:text-white text-sm">✕</button>
+    </div>
+    <div id="metricsBody" class="grid grid-cols-3 gap-3"></div>
+    <div class="text-[11px] text-slate-500 mt-4">Aggregated across all queries this session · Prometheus feed at <code>/metrics/prom</code></div>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const LS = "telcolens_convos";
+
+let convos = JSON.parse(localStorage.getItem(LS) || "[]");
+let currentId = convos[0]?.id || null;
+
+const save = () => localStorage.setItem(LS, JSON.stringify(convos));
+const current = () => convos.find(c => c.id === currentId);
+const uid = () => "c" + Date.now() + Math.floor(Math.random()*1000);
+
+function newChat() {
+  const c = { id: uid(), title: "New chat", messages: [] };
+  convos.unshift(c); currentId = c.id; save(); renderAll();
+}
+function selectChat(id) { currentId = id; renderAll(); }
+function deleteChat(id, e) {
+  e.stopPropagation();
+  convos = convos.filter(c => c.id !== id);
+  if (currentId === id) currentId = convos[0]?.id || null;
+  save(); if (!currentId) newChat(); else renderAll();
+}
+
+function renderConvos() {
+  $("#convos").innerHTML = convos.map(c => `
+    <div data-id="${c.id}" class="convo group flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer ${c.id===currentId?'bg-[#161f33] text-white':'text-slate-400 hover:bg-[#10182a]'}">
+      <span class="truncate">${c.title}</span>
+      <button data-del="${c.id}" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-300 text-xs">✕</button>
+    </div>`).join("") || `<div class="text-[11px] text-slate-600 px-3">No chats yet</div>`;
+  document.querySelectorAll(".convo").forEach(el => el.onclick = () => selectChat(el.dataset.id));
+  document.querySelectorAll("[data-del]").forEach(el => el.onclick = (e) => deleteChat(el.dataset.del, e));
+}
+
+function badge(label, val, good) {
+  const color = good ? "text-emerald-300" : "text-rose-300";
+  return `<span class="pill rounded-md px-2 py-1 text-[11px]">${label} <span class="${color} font-semibold">${val}</span></span>`;
+}
+
+function answerCard(m) {
+  const ev = m.evaluation || {}, c = m.cost || {};
+  const routing = m.complexity === "complex"
+    ? `<span class="text-fuchsia-300">complex</span> → ${(m.sub_queries||[]).length} sub-queries`
+    : `<span class="text-sky-300">simple</span>`;
+  const subs = m.complexity === "complex"
+    ? `<div class="text-[11px] text-slate-500 mt-1">${(m.sub_queries||[]).map(s=>"• "+s).join("<br/>")}</div>` : "";
+  const sources = (m.sources||[]).map(s =>
+    `<div class="flex justify-between text-[11px]"><span class="text-slate-400">${s.source}</span><span class="text-slate-600">${s.score}</span></div>`).join("");
+  return `
+    <div class="text-[11px] text-slate-500 mb-2">routing: ${routing}${subs}</div>
+    <div class="text-slate-100 leading-relaxed mb-3 text-sm">${m.answer||"—"}</div>
+    <div class="flex flex-wrap gap-2 mb-2">
+      ${badge("faithfulness", ev.faithfulness, (ev.faithfulness||0)>=0.7)}
+      ${badge("hallucination", ev.hallucination_risk, (ev.hallucination_risk||0)<=0.3)}
+      ${badge("relevancy", ev.answer_relevancy, (ev.answer_relevancy||0)>=0.5)}
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <span class="pill rounded-md px-2 py-1 text-[11px]">tokens ${(c.tokens_in||0)}/${(c.tokens_out||0)}</span>
+      <span class="pill rounded-md px-2 py-1 text-[11px]">$${c.usd ?? 0}</span>
+      <span class="pill rounded-md px-2 py-1 text-[11px]">${c.latency_ms ?? 0}ms</span>
+      <span class="pill rounded-md px-2 py-1 text-[11px] text-slate-500">${ev.method||""}</span>
+    </div>
+    <details class="text-slate-500 mt-2"><summary class="text-[11px] cursor-pointer">sources (${(m.sources||[]).length})</summary><div class="mt-1 space-y-1">${sources}</div></details>`;
+}
+
+function renderMessages() {
+  const c = current();
+  $("#convoTitle").textContent = c?.title || "New chat";
+  if (!c || !c.messages.length) {
+    $("#messages").innerHTML = `<div class="text-center text-slate-600 text-sm mt-20">Ask a question to begin.</div>`;
+    return;
+  }
+  $("#messages").innerHTML = c.messages.map(m => m.role === "user"
+    ? `<div class="flex justify-end"><div class="bg-indigo-500/20 border border-indigo-500/30 rounded-xl px-4 py-2 text-sm max-w-[80%]">${m.text}</div></div>`
+    : `<div class="card rounded-xl p-4 max-w-[88%]">${answerCard(m)}</div>`).join("");
+  $("#messages").scrollTop = $("#messages").scrollHeight;
+}
+
+function renderAll() { renderConvos(); renderMessages(); }
+
+async function loadStatus() {
+  try {
+    const d = await (await fetch("/api")).json();
+    const mode = d.mode === "live" ? '<span class="text-emerald-400">live</span>' : '<span class="text-amber-400">demo</span>';
+    $("#status").innerHTML = `mode: ${mode} · ${d.indexed_chunks} chunks · langfuse: ${d.langfuse?"on":"off"}`;
+  } catch { $("#status").textContent = "backend offline"; }
+}
+
+async function loadDocs() {
+  try {
+    const d = await (await fetch("/documents")).json();
+    $("#docList").innerHTML = (d.documents||[]).map(x =>
+      `<div class="pill rounded-lg px-3 py-2 flex justify-between text-xs"><span class="truncate text-slate-300">${x.source}</span><span class="text-slate-500">${x.chunks}</span></div>`
+    ).join("") || `<div class="text-[11px] text-slate-600">No documents indexed</div>`;
+  } catch {}
+}
+
+async function uploadFile(file) {
+  $("#uploadMsg").textContent = `Uploading ${file.name}…`;
+  const fd = new FormData(); fd.append("file", file);
+  try {
+    const d = await (await fetch("/ingest", { method:"POST", body: fd })).json();
+    $("#uploadMsg").innerHTML = `<span class="text-emerald-400">✓ ${d.filename}: +${d.ingested_chunks} chunks</span>`;
+    loadDocs(); loadStatus(); loadSuggestions();
+  } catch (e) { $("#uploadMsg").innerHTML = `<span class="text-rose-300">upload failed</span>`; }
+}
+
+const STEPS = ["route","retrieve","grade","generate","evaluate"];
+function animatePipeline() {
+  $("#pipeline").classList.remove("hidden");
+  document.querySelectorAll(".step").forEach(s => s.className = "step border rounded px-2 py-0.5 border-[#28344e] text-slate-500");
+  let i = 0;
+  const t = setInterval(() => {
+    if (i > 0) document.querySelector(`.step[data-s="${STEPS[i-1]}"]`)?.classList.add("done");
+    const el = document.querySelector(`.step[data-s="${STEPS[i]}"]`);
+    if (el) el.classList.add("active");
+    if (++i >= STEPS.length) clearInterval(t);
+  }, 180);
+  return t;
+}
+
+async function send() {
+  const q = $("#q").value.trim(); if (!q) return;
+  if (!current()) newChat();
+  const c = current();
+  c.messages.push({ role:"user", text:q });
+  if (c.title === "New chat") c.title = q.slice(0, 38);
+  $("#q").value = ""; save(); renderAll();
+
+  $("#ask").disabled = true; $("#ask").textContent = "…";
+  const timer = animatePipeline();
+  try {
+    const d = await (await fetch("/query", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({question:q}) })).json();
+    c.messages.push({ role:"assistant", ...d });
+    save(); renderMessages();
+  } catch (e) {
+    c.messages.push({ role:"assistant", answer:"Error contacting backend." }); save(); renderMessages();
+  } finally {
+    clearInterval(timer); setTimeout(()=>$("#pipeline").classList.add("hidden"), 400);
+    $("#ask").disabled = false; $("#ask").textContent = "Ask";
+  }
+}
+
+async function openMetrics() {
+  const m = await (await fetch("/metrics")).json();
+  const card = (label, val) => `<div class="pill rounded-xl p-3 text-center"><div class="text-lg font-semibold text-white">${val}</div><div class="text-[11px] text-slate-400 mt-1">${label}</div></div>`;
+  $("#metricsBody").innerHTML =
+    card("queries", m.total_queries) +
+    card("complex share", (m.complex_share*100).toFixed(0)+"%") +
+    card("avg faithfulness", m.avg_faithfulness) +
+    card("avg halluc. risk", m.avg_hallucination_risk) +
+    card("avg relevancy", m.avg_relevancy) +
+    card("avg latency", m.avg_latency_ms+"ms") +
+    card("total cost", "$"+m.total_cost_usd) +
+    card("total tokens", m.total_tokens) +
+    card("eval mode", "demo-proxy");
+  $("#metricsModal").classList.remove("hidden");
+}
+
+let chartInstance = null;
+async function openCharts() {
+  const metrics = (await (await fetch("/chart/metrics")).json()).metrics || [];
+  $("#chartsModal").classList.remove("hidden");
+  if (!metrics.length) {
+    $("#chartMetrics").innerHTML = ""; $("#chartCanvas").classList.add("hidden");
+    $("#chartEmpty").classList.remove("hidden"); return;
+  }
+  $("#chartCanvas").classList.remove("hidden"); $("#chartEmpty").classList.add("hidden");
+  $("#chartMetrics").innerHTML = metrics.map((m,i) =>
+    `<button data-m="${m.key}" class="metricBtn pill rounded-md px-2.5 py-1 text-xs ${i===0?'text-white border-indigo-500':'text-slate-400'}">${m.label}</button>`).join("");
+  document.querySelectorAll(".metricBtn").forEach(b => b.onclick = () => {
+    document.querySelectorAll(".metricBtn").forEach(x => x.className = "metricBtn pill rounded-md px-2.5 py-1 text-xs text-slate-400");
+    b.className = "metricBtn pill rounded-md px-2.5 py-1 text-xs text-white border-indigo-500";
+    drawChart(b.dataset.m);
+  });
+  drawChart(metrics[0].key);
+}
+
+async function drawChart(metric) {
+  const d = await (await fetch("/chart?metric=" + metric)).json();
+  const labels = d.points.map(p => p.company);
+  const datasets = [
+    { label: "current", data: d.points.map(p => p.current), backgroundColor: "#6366f1" },
+    { label: "prior", data: d.points.map(p => p.prior), backgroundColor: "#334155" },
+  ];
+  if (chartInstance) chartInstance.destroy();
+  chartInstance = new Chart($("#chartCanvas"), {
+    type: "bar",
+    data: { labels, datasets },
+    options: {
+      plugins: { legend: { labels: { color: "#94a3b8" } },
+                 title: { display: true, text: `${d.label} (${d.unit})`, color: "#e2e8f0" } },
+      scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#1e2940" } },
+                y: { ticks: { color: "#94a3b8" }, grid: { color: "#1e2940" } } },
+    },
+  });
+}
+
+// wiring
+$("#openCharts").onclick = openCharts;
+$("#closeCharts").onclick = () => $("#chartsModal").classList.add("hidden");
+$("#chartsModal").onclick = (e) => { if (e.target.id === "chartsModal") $("#chartsModal").classList.add("hidden"); };
+$("#openMetrics").onclick = openMetrics;
+$("#closeMetrics").onclick = () => $("#metricsModal").classList.add("hidden");
+$("#metricsModal").onclick = (e) => { if (e.target.id === "metricsModal") $("#metricsModal").classList.add("hidden"); };
+$("#newChat").onclick = newChat;
+$("#ask").onclick = send;
+$("#q").addEventListener("keydown", e => { if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
+$("#toggleDocs").onclick = () => $("#docs").classList.toggle("hidden");
+$("#resetDocs").onclick = async () => { await fetch("/reset", {method:"POST"}); loadDocs(); loadStatus(); loadSuggestions(); $("#uploadMsg").textContent="all documents cleared"; };
+$("#file").onchange = e => e.target.files[0] && uploadFile(e.target.files[0]);
+const drop = $("#drop");
+["dragover","dragenter"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("border-indigo-500"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("border-indigo-500"); }));
+drop.addEventListener("drop", e => e.dataTransfer.files[0] && uploadFile(e.dataTransfer.files[0]));
+async function loadSuggestions() {
+  let items = [];
+  try { items = (await (await fetch("/suggest")).json()).suggestions || []; } catch {}
+  if (!items.length) {
+    $("#examples").innerHTML = `<span class="text-slate-600">Upload a document (📄) to see suggested questions</span>`;
+    return;
+  }
+  $("#examples").innerHTML = items.map(x =>
+    `<button class="pill rounded-md px-2 py-1 text-slate-400 hover:text-white">${x.length>46?x.slice(0,46)+"…":x}</button>`).join("");
+  [...$("#examples").children].forEach((b,i)=> b.onclick = ()=>{ $("#q").value = items[i]; send(); });
+}
+
+if (!convos.length) newChat(); else renderAll();
+loadStatus(); loadDocs(); loadSuggestions();
+</script>
+</body>
+</html>

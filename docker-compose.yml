@@ -1,0 +1,13 @@
+services:
+  telcolens:
+    build: .
+    container_name: telcolens
+    ports:
+      - "8077:8000"
+    environment:
+      - TELCOLENS_DEMO=1
+      # live mode: set TELCOLENS_DEMO=0 and pass OPENAI_API_KEY
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

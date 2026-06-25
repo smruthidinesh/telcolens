@@ -1,0 +1,12 @@
+{"question": "What was Aurora Telecom postpaid churn in Q3 2025?", "expected_contains": ["0.92"], "company": "Aurora"}
+{"question": "What was Aurora Telecom total revenue in Q3 2025?", "expected_contains": ["4.21"], "company": "Aurora"}
+{"question": "What was Aurora postpaid ARPU?", "expected_contains": ["58.40"], "company": "Aurora"}
+{"question": "How many postpaid phone net additions did Aurora report?", "expected_contains": ["312"], "company": "Aurora"}
+{"question": "What was Aurora free cash flow in Q3 2025?", "expected_contains": ["1.02"], "company": "Aurora"}
+{"question": "What was Aurora net debt to EBITDA?", "expected_contains": ["2.6"], "company": "Aurora"}
+{"question": "What is Nimbus net revenue retention?", "expected_contains": ["114"], "company": "Nimbus"}
+{"question": "What was Nimbus gross revenue churn?", "expected_contains": ["11.2"], "company": "Nimbus"}
+{"question": "What was Nimbus annual recurring revenue?", "expected_contains": ["2.48"], "company": "Nimbus"}
+{"question": "What was Nimbus subscription gross margin?", "expected_contains": ["81"], "company": "Nimbus"}
+{"question": "What was Nimbus operating margin in Q3 2025?", "expected_contains": ["6%"], "company": "Nimbus"}
+{"question": "What share of Nimbus paid seats use the AI copilot?", "expected_contains": ["38"], "company": "Nimbus"}

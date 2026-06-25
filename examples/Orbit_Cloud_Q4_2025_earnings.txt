@@ -1,0 +1,16 @@
+Orbit Cloud (SaaS) — Q4 2025 Earnings Summary
+
+Orbit Cloud reported Q4 2025 revenue of $748 million, up 27% year over year. Annual recurring
+revenue (ARR) reached $3.02 billion, up 25% year over year. Net revenue retention (NRR) was 117%,
+down from 121% a year ago, reflecting slower seat expansion in the mid-market segment.
+
+Gross revenue churn rose to 9.8% on an annualized basis, up from 8.1% in Q4 2024, concentrated in
+customers with fewer than 100 seats. Enterprise logo churn stayed low at 3.4%. Management
+attributed the increase to longer procurement cycles and competitive pricing pressure.
+
+Subscription gross margin was 83%. Operating margin was 4%, turning positive for the first time as
+the AI assistant product reached 46% of paid seats. Remaining performance obligations (RPO) were
+$3.9 billion. Free cash flow margin improved to 14%, up from 8% a year ago.
+
+The company guided to NRR stabilizing in the 116-119% range and expects mid-market churn to
+moderate as usage-based pricing and onboarding improvements roll out in H1 2026.

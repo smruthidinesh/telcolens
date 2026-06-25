@@ -1,0 +1,17 @@
+Nimbus Cloud (SaaS) — Q3 2025 Earnings Summary
+
+Nimbus Cloud reported Q3 2025 revenue of $612 million, up 24% year over year. Annual recurring
+revenue (ARR) reached $2.48 billion, up 22% year over year. Net revenue retention (NRR) was 114%,
+down from 119% a year ago, reflecting softer expansion in the small-business segment.
+
+Gross revenue churn rose to 11.2% on an annualized basis, up from 9.4% in Q3 2024, concentrated
+in customers with fewer than 50 seats. Enterprise logo churn remained low at 4.1%. Management
+attributed the SMB churn increase to budget tightening and increased competition.
+
+Subscription gross margin was 81%. Operating margin was negative 6% as the company continued to
+invest in its AI copilot product, which is now used by 38% of paid seats. Remaining performance
+obligations (RPO) were $3.1 billion.
+
+Free cash flow margin improved to 9%, up from 4% a year ago. The company guided to NRR
+stabilizing in the 113-116% range and expects SMB churn to moderate as new onboarding and
+in-product engagement features roll out in Q4 2025.

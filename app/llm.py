@@ -16,10 +16,17 @@ def complete(prompt: str, context: List[Dict[str, Any]]) -> Tuple[str, Dict[str,
     """Return (answer, usage). Live mode calls the LLM; demo mode answers
     extractively from the retrieved context so the system is fully demoable
     without credentials."""
-    if config.GROQ_API_KEY:
-        return _complete_groq(prompt)
-    if config.live_llm_enabled():
-        return _complete_openai(prompt)
+    try:
+        if config.GROQ_API_KEY:
+            return _complete_groq(prompt)
+        if config.live_llm_enabled():
+            return _complete_openai(prompt)
+    except Exception as e:
+        # degrade gracefully: never hard-fail a query if the provider errors
+        answer, usage = _complete_extractive(prompt, context)
+        usage["mode"] = "fallback"
+        usage["error"] = f"{type(e).__name__}: {str(e)[:300]}"
+        return answer, usage
     return _complete_extractive(prompt, context)
 
 

@@ -25,5 +25,6 @@ def generate(state: AgentState) -> AgentState:
         "tokens_out": usage["tokens_out"],
         "usd": llm.usd_cost(usage),
         "mode": usage.get("mode"),
+        "error": usage.get("error"),
     }
     return {"answer": answer, "sources": sources, "cost": cost}

@@ -1,18 +1,6 @@
 import re
 from .vector_store import store
 
-# metric keyword -> question template (filled with the company name)
-_METRICS = [
-    ("net revenue retention", "What is {co} net revenue retention?"),
-    ("churn", "What was {co} churn?"),
-    ("arpu", "What was {co} ARPU?"),
-    ("total revenue", "What was {co} total revenue?"),
-    ("operating margin", "What was {co} operating margin?"),
-    ("free cash flow", "What was {co} free cash flow?"),
-    ("annual recurring revenue", "What was {co} ARR?"),
-    ("net debt", "What was {co} net debt to EBITDA?"),
-]
-
 _STOP = re.compile(r"^(q[1-4]|fy?\d{2,4}|\d{4}|annual|earnings|summary|report|filing|results)$", re.I)
 
 
@@ -32,7 +20,9 @@ _STOPWORDS = set(
     "its their our your we you they he she has have had not but which who whom whose will would can "
     "could should may might also more most than then them there here into out up down over about "
     "above after before between during while because so such no nor only own same other these those "
-    "what when where why how all any both each few many some used using use one two three full year".split()
+    "what when where why how all any both each few many some used using use one two three full year "
+    "present presents presented based provides provide provided approach system results result include includes "
+    "including document documents paper report reports total within across via per also given new key main".split()
 )
 
 
@@ -50,33 +40,29 @@ def _keywords(text: str, n: int = 2):
 
 
 def build(limit: int = 5):
-    by_source, raw_by_source = {}, {}
+    """Topic-agnostic suggestions, driven entirely by what's actually in the
+    uploaded documents — no hardcoded domain (financial) questions."""
+    raw_by_source = {}
     for r in store.records:
-        by_source.setdefault(r["source"], []).append(r["text"].lower())
         raw_by_source.setdefault(r["source"], []).append(r["text"])
 
-    companies, metric_qs, generic_qs = [], [], []
-    for source in by_source:
-        co = _company(source)
-        companies.append(co)
-        blob = " ".join(by_source[source])
-        # specific financial questions (when the doc has those metrics)
-        metric_qs.append([t.format(co=co) for k, t in _METRICS if k in blob])
-        # generic questions that work for ANY document
-        g = [f"Summarize the key points of {co}"]
-        g += [f"What does the document say about {kw}?" for kw in _keywords(" ".join(raw_by_source[source]))]
-        generic_qs.append(g)
+    labels, per_doc = [], []
+    for source in raw_by_source:
+        label = _company(source)
+        labels.append(label)
+        q = [f"Summarize the key points of {label}"]
+        q += [f"What does the document say about {kw}?" for kw in _keywords(" ".join(raw_by_source[source]), 3)]
+        per_doc.append(q)
 
     suggestions = []
-    if len(companies) >= 2:
-        suggestions.append(f"Compare {companies[0]} and {companies[1]}")
+    if len(labels) >= 2:
+        suggestions.append(f"Compare {labels[0]} and {labels[1]}")
 
-    # specific (financial) questions first, then generic — interleaved across docs
-    for bucket in (metric_qs, generic_qs):
-        for i in range(max((len(q) for q in bucket), default=0)):
-            for q in bucket:
-                if i < len(q):
-                    suggestions.append(q[i])
+    # interleave across documents so each gets represented
+    for i in range(max((len(q) for q in per_doc), default=0)):
+        for q in per_doc:
+            if i < len(q):
+                suggestions.append(q[i])
 
     seen, deduped = set(), []
     for s in suggestions:

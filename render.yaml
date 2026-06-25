@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: telcolens
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: TELCOLENS_DEMO
+        value: "1"
+      - key: TELCOLENS_SEED
+        value: "1"

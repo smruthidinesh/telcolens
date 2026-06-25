@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from . import config, observability, metrics, suggest, charts
 from .vector_store import store
-from .ingestion import ingest_bytes, list_sources
+from .ingestion import ingest_bytes, list_sources, ingest_sample_dir
 from .workflow import graph
 
 app = FastAPI(title="TelcoLens", description="Agentic RAG analyst for telecom/SaaS earnings & churn")
@@ -19,7 +19,10 @@ class Query(BaseModel):
 
 @app.on_event("startup")
 def _startup():
-    store.load()  # start empty; users upload their own documents
+    store.load()
+    # populated public demo when deployed; empty for local dev
+    if config.SEED_ON_START and store.size == 0:
+        ingest_sample_dir()
 
 
 @app.get("/", include_in_schema=False)

@@ -1,6 +1,9 @@
 import os
 
 DEMO_MODE = os.getenv("TELCOLENS_DEMO", "1") == "1"
+# pre-seed sample docs on startup (set in deployed/containerized envs so the
+# public demo is populated; local dev stays empty)
+SEED_ON_START = os.getenv("TELCOLENS_SEED", "0") == "1"
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 LLM_MODEL = os.getenv("TELCOLENS_LLM_MODEL", "gpt-4o-mini")

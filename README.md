@@ -84,6 +84,16 @@ API docs at `http://localhost:8000/docs`.
 2. Uncomment the optional deps in `requirements.txt` and reinstall.
 3. (Optional) add Langfuse keys for hosted cost/trace dashboards.
 
+## Deploy (free)
+
+The app is containerized and binds to `$PORT`, so it runs on any free Docker host. A
+[`render.yaml`](render.yaml) blueprint is included; the deployed image auto-seeds sample data
+(`TELCOLENS_SEED=1`) so the public demo is populated on first load.
+
+**Render (one-click):** New → Blueprint → connect this repo → Apply. Live at `https://<name>.onrender.com`.
+
+> Free instances sleep after ~15 min idle (first request then takes ~30–60s to wake).
+
 ## Security & limitations
 
 This is a single-user demo, hardened for the threats that matter at that scope:

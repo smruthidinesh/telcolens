@@ -163,8 +163,9 @@ function answerCard(m) {
     ? `<div class="text-[11px] text-slate-500 mt-1">${(m.sub_queries||[]).map(s=>"• "+esc(s)).join("<br/>")}</div>` : "";
   const sources = (m.sources||[]).map(s =>
     `<div class="flex justify-between text-[11px]"><span class="text-slate-400">${esc(s.source)}</span><span class="text-slate-600">${esc(s.score)}</span></div>`).join("");
+  const retr = m.retrieval ? ` · <span class="text-teal-300">${esc(m.retrieval)}</span>` : "";
   return `
-    <div class="text-[11px] text-slate-500 mb-2">routing: ${routing}${subs}</div>
+    <div class="text-[11px] text-slate-500 mb-2">routing: ${routing}${retr}${subs}</div>
     <div class="text-slate-100 leading-relaxed mb-3 text-sm">${m.answer ? esc(m.answer) : "—"}</div>
     <div class="flex flex-wrap gap-2 mb-2">
       ${badge("faithfulness", ev.faithfulness, (ev.faithfulness||0)>=0.7)}

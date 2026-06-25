@@ -17,6 +17,9 @@ EMBED_DIM = 384
 TOP_K = 4
 MAX_RETRIEVAL_RETRIES = 1
 RELEVANCE_THRESHOLD = 0.15
+# if the whole indexed corpus fits this budget, skip retrieval and pass the full
+# text to the LLM (long-context mode, like ChatGPT); above it, use hybrid RAG.
+FULL_CONTEXT_CHARS = 48000  # ~12k tokens
 
 DATA_DIR = os.getenv("TELCOLENS_DATA", os.path.join(os.path.dirname(__file__), "..", "data"))
 

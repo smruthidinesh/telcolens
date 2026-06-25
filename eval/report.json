@@ -1,8 +1,8 @@
 {
   "cases": 12,
-  "accuracy": 0.5,
+  "accuracy": 0.417,
   "avg_faithfulness": 1.0,
-  "avg_relevancy": 0.538,
+  "avg_relevancy": 0.508,
   "avg_hallucination_risk": 0.0,
-  "total_cost_usd": 0.002551
+  "total_cost_usd": 0.003097
 }

@@ -83,6 +83,29 @@ class VectorStore:
             })
         return out
 
+    def total_chars(self) -> int:
+        return sum(len(r["text"]) for r in self.records)
+
+    def score_all(self, query: str) -> List[Dict[str, Any]]:
+        """Return ALL chunks scored by dense cosine vs the query (no top-k cut).
+        Used by long-context mode so the LLM sees the whole document while the
+        cosine score still drives the relevance gate and demo answer weighting."""
+        if not self.records:
+            return []
+        self._ensure_index()
+        q = embeddings.embed(query)
+        dense = self._matrix @ q / (
+            np.linalg.norm(self._matrix, axis=1) * (np.linalg.norm(q) or 1.0) + 1e-9
+        )
+        order = np.argsort(-dense)
+        return [{
+            "id": self.records[int(i)]["id"],
+            "text": self.records[int(i)]["text"],
+            "source": self.records[int(i)].get("source", "unknown"),
+            "metadata": self.records[int(i)].get("metadata", {}),
+            "score": round(float(dense[int(i)]), 3),
+        } for i in order]
+
     def save(self):
         os.makedirs(config.DATA_DIR, exist_ok=True)
         with open(_STORE_PATH, "w") as f:

@@ -8,6 +8,7 @@ class AgentState(TypedDict, total=False):
     k: int
     retries: int
     documents: List[Dict[str, Any]]   # [{id, text, score, source}]
+    retrieval: str           # "full-context" | "hybrid"
     relevant: bool
     answer: str
     sources: List[Dict[str, Any]]

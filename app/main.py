@@ -108,6 +108,7 @@ def query(q: Query):
     response = {
         "question": q.question,
         "complexity": result.get("complexity"),
+        "retrieval": result.get("retrieval"),
         "sub_queries": result.get("sub_queries"),
         "answer": result.get("answer"),
         "sources": result.get("sources"),

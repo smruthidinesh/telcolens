@@ -16,12 +16,12 @@ def sample_index():
     """Hermetic index: clear any persisted state and seed only the samples,
     so pipeline tests don't depend on whatever is on disk."""
     store.records.clear()
-    store._matrix = None
+    store._invalidate()
     ingest_sample_dir()
     yield
     # restore an empty index so tests don't leave seeded data behind
     store.records.clear()
-    store._matrix = None
+    store._invalidate()
     store.save()
 
 

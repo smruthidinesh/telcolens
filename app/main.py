@@ -69,7 +69,7 @@ def chart(metric: str):
 @app.post("/reset")
 def reset():
     store.records.clear()
-    store._matrix = None
+    store._invalidate()
     store.save()
     return {"reset": True, "total_chunks": 0}
 

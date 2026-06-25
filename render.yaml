@@ -7,5 +7,3 @@ services:
     envVars:
       - key: TELCOLENS_DEMO
         value: "1"
-      - key: TELCOLENS_SEED
-        value: "1"

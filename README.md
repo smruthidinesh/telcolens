@@ -17,6 +17,8 @@ grounded answers, and **evaluates every answer for faithfulness and cost**.
 
 ## What makes it more than a chatbot
 
+- **Hybrid retrieval** — dense (semantic) + BM25 (lexical) search fused with **Reciprocal Rank
+  Fusion**, so exact terms (names, figures) and meaning are both caught. See `app/vector_store.py`.
 - **Agentic routing** — queries are triaged into `simple` (single retrieval) vs `complex`
   (decomposed into sub-queries with wider retrieval). See `app/nodes/route.py`.
 - **Relevance gate + retrieval loop** — weak retrieval triggers a widen-and-retry edge
@@ -87,8 +89,8 @@ API docs at `http://localhost:8000/docs`.
 ## Deploy (free)
 
 The app is containerized and binds to `$PORT`, so it runs on any free Docker host. A
-[`render.yaml`](render.yaml) blueprint is included; the deployed image auto-seeds sample data
-(`TELCOLENS_SEED=1`) so the public demo is populated on first load.
+[`render.yaml`](render.yaml) blueprint is included. The app starts empty — upload your own
+documents to begin. (Set `TELCOLENS_SEED=1` to pre-load the bundled sample docs instead.)
 
 **Render (one-click):** New → Blueprint → connect this repo → Apply. Live at `https://<name>.onrender.com`.
 

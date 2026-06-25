@@ -1,7 +1,10 @@
 import re
+import logging
 from typing import List, Dict, Any, Tuple
 
 from . import config
+
+_log = logging.getLogger("telcolens")
 
 # Rough USD per 1K tokens for the default model (update per provider pricing).
 _PRICE_IN = 0.00015
@@ -22,10 +25,11 @@ def complete(prompt: str, context: List[Dict[str, Any]]) -> Tuple[str, Dict[str,
         if config.live_llm_enabled():
             return _complete_openai(prompt)
     except Exception as e:
-        # degrade gracefully: never hard-fail a query if the provider errors
+        # degrade gracefully: never hard-fail a query if the provider errors.
+        # Log server-side (don't leak internal error detail to the client).
+        _log.warning("LLM provider failed (%s); falling back to extractive: %s", config.provider(), e)
         answer, usage = _complete_extractive(prompt, context)
         usage["mode"] = "fallback"
-        usage["error"] = f"{type(e).__name__}: {str(e)[:300]}"
         return answer, usage
     return _complete_extractive(prompt, context)
 

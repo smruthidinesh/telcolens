@@ -24,7 +24,7 @@
   <aside class="w-64 shrink-0 border-r border-[#1e2940] flex flex-col bg-[#0c111c]">
     <div class="p-4 border-b border-[#1e2940]">
       <div class="text-lg font-semibold text-white">TelcoLens</div>
-      <div class="text-[11px] text-slate-500">agentic RAG · telecom &amp; SaaS</div>
+      <div class="text-[11px] text-slate-500 leading-relaxed mt-1">Agentic RAG document analyst — upload any document and ask questions; answers are grounded in your files with trust &amp; cost scores.</div>
     </div>
     <div class="p-3">
       <button id="newChat" class="w-full bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium py-2 rounded-lg">+ New chat</button>
@@ -63,7 +63,7 @@
         <div id="examples" class="flex flex-wrap gap-2 text-[11px] mb-2"></div>
         <div class="flex items-end gap-2">
           <textarea id="q" rows="1" class="flex-1 bg-transparent outline-none resize-none text-slate-100 placeholder:text-slate-500 text-sm"
-            placeholder="Ask about revenue, churn, ARPU, NRR…  (Enter to send)"></textarea>
+            placeholder="Ask a question about your documents…  (Enter to send)"></textarea>
           <button id="ask" class="bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium px-4 py-2 rounded-lg">Ask</button>
         </div>
       </div>
@@ -246,14 +246,20 @@ async function send() {
 
   $("#ask").disabled = true; $("#ask").textContent = "…";
   const timer = animatePipeline();
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), 90000);  // never hang the button
   try {
-    const d = await (await fetch("/query", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({question:q}) })).json();
+    const r = await fetch("/query", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({question:q}), signal: ctrl.signal });
+    const d = await r.json();
     c.messages.push({ role:"assistant", ...d });
     save(); renderMessages();
   } catch (e) {
-    c.messages.push({ role:"assistant", answer:"Error contacting backend." }); save(); renderMessages();
+    const msg = e.name === "AbortError"
+      ? "Timed out — the server may be waking from sleep. Please try again."
+      : "Error contacting backend.";
+    c.messages.push({ role:"assistant", answer: msg }); save(); renderMessages();
   } finally {
-    clearInterval(timer); setTimeout(()=>$("#pipeline").classList.add("hidden"), 400);
+    clearTimeout(timeout); clearInterval(timer); setTimeout(()=>$("#pipeline").classList.add("hidden"), 400);
     $("#ask").disabled = false; $("#ask").textContent = "Ask";
   }
 }

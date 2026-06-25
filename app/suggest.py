@@ -27,28 +27,56 @@ def _company(source: str) -> str:
     return " ".join(out) or name
 
 
+_STOPWORDS = set(
+    "the a an and or of to in for on with was were is are be been being by at as from that this it "
+    "its their our your we you they he she has have had not but which who whom whose will would can "
+    "could should may might also more most than then them there here into out up down over about "
+    "above after before between during while because so such no nor only own same other these those "
+    "what when where why how all any both each few many some used using use one two three full year".split()
+)
+
+
+def _keywords(text: str, n: int = 2):
+    """Most frequent salient words, keeping original case (e.g. Paris, Gustave).
+    Lets us suggest questions for ANY document, not just financial ones."""
+    counts, repr_form = {}, {}
+    for w in re.findall(r"[A-Za-z][A-Za-z0-9\-]{2,}", text):
+        lw = w.lower()
+        if lw in _STOPWORDS:
+            continue
+        counts[lw] = counts.get(lw, 0) + 1
+        repr_form.setdefault(lw, w)
+    return [repr_form[k] for k in sorted(counts, key=lambda k: -counts[k])[:n]]
+
+
 def build(limit: int = 5):
-    by_source = {}
+    by_source, raw_by_source = {}, {}
     for r in store.records:
         by_source.setdefault(r["source"], []).append(r["text"].lower())
+        raw_by_source.setdefault(r["source"], []).append(r["text"])
 
-    companies, per_company = [], []
-    for source, texts in by_source.items():
+    companies, metric_qs, generic_qs = [], [], []
+    for source in by_source:
         co = _company(source)
         companies.append(co)
-        blob = " ".join(texts)
-        per_company.append([t.format(co=co) for k, t in _METRICS if k in blob])
+        blob = " ".join(by_source[source])
+        # specific financial questions (when the doc has those metrics)
+        metric_qs.append([t.format(co=co) for k, t in _METRICS if k in blob])
+        # generic questions that work for ANY document
+        g = [f"Summarize the key points of {co}"]
+        g += [f"What does the document say about {kw}?" for kw in _keywords(" ".join(raw_by_source[source]))]
+        generic_qs.append(g)
 
-    # round-robin across companies so suggestions show variety, not one company
     suggestions = []
-    for i in range(max((len(q) for q in per_company), default=0)):
-        for q in per_company:
-            if i < len(q):
-                suggestions.append(q[i])
-
-    # cross-document comparison when 2+ companies are indexed
     if len(companies) >= 2:
-        suggestions.insert(0, f"Compare churn and drivers at {companies[0]} versus {companies[1]} and explain the impact")
+        suggestions.append(f"Compare {companies[0]} and {companies[1]}")
+
+    # specific (financial) questions first, then generic — interleaved across docs
+    for bucket in (metric_qs, generic_qs):
+        for i in range(max((len(q) for q in bucket), default=0)):
+            for q in bucket:
+                if i < len(q):
+                    suggestions.append(q[i])
 
     seen, deduped = set(), []
     for s in suggestions:

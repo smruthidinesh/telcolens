@@ -16,6 +16,8 @@ def complete(prompt: str, context: List[Dict[str, Any]]) -> Tuple[str, Dict[str,
     """Return (answer, usage). Live mode calls the LLM; demo mode answers
     extractively from the retrieved context so the system is fully demoable
     without credentials."""
+    if config.GROQ_API_KEY:
+        return _complete_groq(prompt)
     if config.live_llm_enabled():
         return _complete_openai(prompt)
     return _complete_extractive(prompt, context)
@@ -64,7 +66,26 @@ def _complete_openai(prompt: str) -> Tuple[str, Dict[str, Any]]:
     return answer, usage
 
 
+def _complete_groq(prompt: str) -> Tuple[str, Dict[str, Any]]:
+    # Groq exposes an OpenAI-compatible API, so we reuse the OpenAI SDK with its base_url.
+    from openai import OpenAI
+
+    client = OpenAI(api_key=config.GROQ_API_KEY, base_url="https://api.groq.com/openai/v1")
+    resp = client.chat.completions.create(
+        model=config.GROQ_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+    )
+    return resp.choices[0].message.content, {
+        "tokens_in": resp.usage.prompt_tokens,
+        "tokens_out": resp.usage.completion_tokens,
+        "mode": "groq",
+    }
+
+
 def usd_cost(usage: Dict[str, Any]) -> float:
+    if usage.get("mode") == "groq":
+        return 0.0  # Groq free tier
     return round(
         usage.get("tokens_in", 0) / 1000 * _PRICE_IN
         + usage.get("tokens_out", 0) / 1000 * _PRICE_OUT,

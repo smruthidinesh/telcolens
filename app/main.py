@@ -34,7 +34,7 @@ def ui():
 def info():
     return {
         "service": "TelcoLens",
-        "mode": "live" if config.live_llm_enabled() else "demo",
+        "mode": config.provider(),
         "langfuse": observability.enabled(),
         "indexed_chunks": store.size,
     }

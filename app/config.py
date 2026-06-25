@@ -8,6 +8,10 @@ SEED_ON_START = os.getenv("TELCOLENS_SEED", "0") == "1"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 LLM_MODEL = os.getenv("TELCOLENS_LLM_MODEL", "gpt-4o-mini")
 
+# Groq = free, OpenAI-compatible LLM API (great for a zero-cost public demo).
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL = os.getenv("TELCOLENS_GROQ_MODEL", "llama-3.3-70b-versatile")
+
 LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY", "")
 LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY", "")
 LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
@@ -21,4 +25,13 @@ DATA_DIR = os.getenv("TELCOLENS_DATA", os.path.join(os.path.dirname(__file__), "
 
 
 def live_llm_enabled() -> bool:
+    # OpenAI fully-live mode (real embeddings + Ragas). Gated by DEMO flag for cost.
     return bool(OPENAI_API_KEY) and not DEMO_MODE
+
+
+def provider() -> str:
+    if GROQ_API_KEY:
+        return "groq"
+    if live_llm_enabled():
+        return "openai"
+    return "demo"

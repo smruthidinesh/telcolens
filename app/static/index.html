@@ -198,7 +198,7 @@ function renderAll() { renderConvos(); renderMessages(); }
 async function loadStatus() {
   try {
     const d = await (await fetch("/api")).json();
-    const mode = d.mode === "live" ? '<span class="text-emerald-400">live</span>' : '<span class="text-amber-400">demo</span>';
+    const mode = d.mode === "demo" ? '<span class="text-amber-400">demo</span>' : `<span class="text-emerald-400">${esc(d.mode)}</span>`;
     $("#status").innerHTML = `mode: ${mode} · ${d.indexed_chunks} chunks · langfuse: ${d.langfuse?"on":"off"}`;
   } catch { $("#status").textContent = "backend offline"; }
 }

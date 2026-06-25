@@ -115,6 +115,9 @@
 
 <script>
 const $ = (s) => document.querySelector(s);
+// escape untrusted text (document content, filenames, questions) before innerHTML
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const LS = "telcolens_convos";
 
 let convos = JSON.parse(localStorage.getItem(LS) || "[]");
@@ -139,7 +142,7 @@ function deleteChat(id, e) {
 function renderConvos() {
   $("#convos").innerHTML = convos.map(c => `
     <div data-id="${c.id}" class="convo group flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer ${c.id===currentId?'bg-[#161f33] text-white':'text-slate-400 hover:bg-[#10182a]'}">
-      <span class="truncate">${c.title}</span>
+      <span class="truncate">${esc(c.title)}</span>
       <button data-del="${c.id}" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-300 text-xs">✕</button>
     </div>`).join("") || `<div class="text-[11px] text-slate-600 px-3">No chats yet</div>`;
   document.querySelectorAll(".convo").forEach(el => el.onclick = () => selectChat(el.dataset.id));
@@ -157,12 +160,12 @@ function answerCard(m) {
     ? `<span class="text-fuchsia-300">complex</span> → ${(m.sub_queries||[]).length} sub-queries`
     : `<span class="text-sky-300">simple</span>`;
   const subs = m.complexity === "complex"
-    ? `<div class="text-[11px] text-slate-500 mt-1">${(m.sub_queries||[]).map(s=>"• "+s).join("<br/>")}</div>` : "";
+    ? `<div class="text-[11px] text-slate-500 mt-1">${(m.sub_queries||[]).map(s=>"• "+esc(s)).join("<br/>")}</div>` : "";
   const sources = (m.sources||[]).map(s =>
-    `<div class="flex justify-between text-[11px]"><span class="text-slate-400">${s.source}</span><span class="text-slate-600">${s.score}</span></div>`).join("");
+    `<div class="flex justify-between text-[11px]"><span class="text-slate-400">${esc(s.source)}</span><span class="text-slate-600">${esc(s.score)}</span></div>`).join("");
   return `
     <div class="text-[11px] text-slate-500 mb-2">routing: ${routing}${subs}</div>
-    <div class="text-slate-100 leading-relaxed mb-3 text-sm">${m.answer||"—"}</div>
+    <div class="text-slate-100 leading-relaxed mb-3 text-sm">${m.answer ? esc(m.answer) : "—"}</div>
     <div class="flex flex-wrap gap-2 mb-2">
       ${badge("faithfulness", ev.faithfulness, (ev.faithfulness||0)>=0.7)}
       ${badge("hallucination", ev.hallucination_risk, (ev.hallucination_risk||0)<=0.3)}
@@ -172,7 +175,7 @@ function answerCard(m) {
       <span class="pill rounded-md px-2 py-1 text-[11px]">tokens ${(c.tokens_in||0)}/${(c.tokens_out||0)}</span>
       <span class="pill rounded-md px-2 py-1 text-[11px]">$${c.usd ?? 0}</span>
       <span class="pill rounded-md px-2 py-1 text-[11px]">${c.latency_ms ?? 0}ms</span>
-      <span class="pill rounded-md px-2 py-1 text-[11px] text-slate-500">${ev.method||""}</span>
+      <span class="pill rounded-md px-2 py-1 text-[11px] text-slate-500">${esc(ev.method||"")}</span>
     </div>
     <details class="text-slate-500 mt-2"><summary class="text-[11px] cursor-pointer">sources (${(m.sources||[]).length})</summary><div class="mt-1 space-y-1">${sources}</div></details>`;
 }
@@ -185,7 +188,7 @@ function renderMessages() {
     return;
   }
   $("#messages").innerHTML = c.messages.map(m => m.role === "user"
-    ? `<div class="flex justify-end"><div class="bg-indigo-500/20 border border-indigo-500/30 rounded-xl px-4 py-2 text-sm max-w-[80%]">${m.text}</div></div>`
+    ? `<div class="flex justify-end"><div class="bg-indigo-500/20 border border-indigo-500/30 rounded-xl px-4 py-2 text-sm max-w-[80%]">${esc(m.text)}</div></div>`
     : `<div class="card rounded-xl p-4 max-w-[88%]">${answerCard(m)}</div>`).join("");
   $("#messages").scrollTop = $("#messages").scrollHeight;
 }
@@ -204,7 +207,7 @@ async function loadDocs() {
   try {
     const d = await (await fetch("/documents")).json();
     $("#docList").innerHTML = (d.documents||[]).map(x =>
-      `<div class="pill rounded-lg px-3 py-2 flex justify-between text-xs"><span class="truncate text-slate-300">${x.source}</span><span class="text-slate-500">${x.chunks}</span></div>`
+      `<div class="pill rounded-lg px-3 py-2 flex justify-between text-xs"><span class="truncate text-slate-300">${esc(x.source)}</span><span class="text-slate-500">${esc(x.chunks)}</span></div>`
     ).join("") || `<div class="text-[11px] text-slate-600">No documents indexed</div>`;
   } catch {}
 }
@@ -214,7 +217,7 @@ async function uploadFile(file) {
   const fd = new FormData(); fd.append("file", file);
   try {
     const d = await (await fetch("/ingest", { method:"POST", body: fd })).json();
-    $("#uploadMsg").innerHTML = `<span class="text-emerald-400">✓ ${d.filename}: +${d.ingested_chunks} chunks</span>`;
+    $("#uploadMsg").innerHTML = `<span class="text-emerald-400">✓ ${esc(d.filename)}: +${esc(d.ingested_chunks)} chunks</span>`;
     loadDocs(); loadStatus(); loadSuggestions();
   } catch (e) { $("#uploadMsg").innerHTML = `<span class="text-rose-300">upload failed</span>`; }
 }
@@ -281,7 +284,7 @@ async function openCharts() {
   }
   $("#chartCanvas").classList.remove("hidden"); $("#chartEmpty").classList.add("hidden");
   $("#chartMetrics").innerHTML = metrics.map((m,i) =>
-    `<button data-m="${m.key}" class="metricBtn pill rounded-md px-2.5 py-1 text-xs ${i===0?'text-white border-indigo-500':'text-slate-400'}">${m.label}</button>`).join("");
+    `<button data-m="${esc(m.key)}" class="metricBtn pill rounded-md px-2.5 py-1 text-xs ${i===0?'text-white border-indigo-500':'text-slate-400'}">${esc(m.label)}</button>`).join("");
   document.querySelectorAll(".metricBtn").forEach(b => b.onclick = () => {
     document.querySelectorAll(".metricBtn").forEach(x => x.className = "metricBtn pill rounded-md px-2.5 py-1 text-xs text-slate-400");
     b.className = "metricBtn pill rounded-md px-2.5 py-1 text-xs text-white border-indigo-500";
@@ -335,7 +338,7 @@ async function loadSuggestions() {
     return;
   }
   $("#examples").innerHTML = items.map(x =>
-    `<button class="pill rounded-md px-2 py-1 text-slate-400 hover:text-white">${x.length>46?x.slice(0,46)+"…":x}</button>`).join("");
+    `<button class="pill rounded-md px-2 py-1 text-slate-400 hover:text-white">${esc(x.length>46?x.slice(0,46)+"…":x)}</button>`).join("");
   [...$("#examples").children].forEach((b,i)=> b.onclick = ()=>{ $("#q").value = items[i]; send(); });
 }
 

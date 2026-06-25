@@ -10,8 +10,7 @@ telecom/SaaS earnings and operational documents (revenue, ARPU, churn, NRR, FCF)
 **LangGraph** state machine that routes queries, retrieves and grades evidence, generates
 grounded answers, and **evaluates every answer for faithfulness and cost**.
 
-> **Screenshot:** _add a screenshot of the UI here_ — run locally (below), then drag an image into
-> this README on GitHub and replace this line with `![TelcoLens UI](docs/screenshot.png)`.
+![TelcoLens UI](docs/screenshot.png)
 
 > Designed to run **offline in demo mode** (no API keys) and scale to a live LLM pipeline by
 > setting credentials. The agentic graph runs identically in both modes.
@@ -84,6 +83,19 @@ API docs at `http://localhost:8000/docs`.
 1. `cp .env.example .env`, set `TELCOLENS_DEMO=0` and `OPENAI_API_KEY`.
 2. Uncomment the optional deps in `requirements.txt` and reinstall.
 3. (Optional) add Langfuse keys for hosted cost/trace dashboards.
+
+## Security & limitations
+
+This is a single-user demo, hardened for the threats that matter at that scope:
+
+- **Stored XSS prevented** — all uploaded document content, filenames, and user questions are
+  HTML-escaped before rendering (`esc()` in the UI), so a malicious document can't inject script.
+- **Upload limits** — uploads are capped at 10 MB and restricted to `.pdf` / `.txt` / `.md`.
+- **Known limitation (by design):** the write endpoints (`/ingest`, `/reset`) are **unauthenticated**
+  for local/demo use. A multi-user or public deployment should add auth (API key / OAuth), CSRF
+  protection, and per-user document isolation.
+- **State is in-process** (a single in-memory vector store). Production would externalize it to
+  pgvector / Qdrant + object storage.
 
 ## Layout
 

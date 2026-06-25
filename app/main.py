@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel
 
@@ -71,9 +71,17 @@ def reset():
     return {"reset": True, "total_chunks": 0}
 
 
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB cap to avoid memory-exhaustion via upload
+ALLOWED_EXT = (".pdf", ".txt", ".md")
+
+
 @app.post("/ingest")
 async def ingest(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith(ALLOWED_EXT):
+        raise HTTPException(415, f"unsupported file type; allowed: {', '.join(ALLOWED_EXT)}")
     raw = await file.read()
+    if len(raw) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "file too large (max 10 MB)")
     added = ingest_bytes(file.filename, raw)
     return {"filename": file.filename, "ingested_chunks": added, "total": store.size}
 

@@ -1,9 +1,17 @@
 # TelcoLens — Agentic RAG Analyst for Telecom & SaaS Earnings
 
+[![CI](https://github.com/smruthidinesh/telcolens/actions/workflows/ci.yml/badge.svg)](https://github.com/smruthidinesh/telcolens/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.11-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688)
+![LangGraph](https://img.shields.io/badge/LangGraph-agentic-6366f1)
+
 An agentic Retrieval-Augmented Generation system that answers analytical questions over
 telecom/SaaS earnings and operational documents (revenue, ARPU, churn, NRR, FCF). Built around a
 **LangGraph** state machine that routes queries, retrieves and grades evidence, generates
 grounded answers, and **evaluates every answer for faithfulness and cost**.
+
+> **Screenshot:** _add a screenshot of the UI here_ — run locally (below), then drag an image into
+> this README on GitHub and replace this line with `![TelcoLens UI](docs/screenshot.png)`.
 
 > Designed to run **offline in demo mode** (no API keys) and scale to a live LLM pipeline by
 > setting credentials. The agentic graph runs identically in both modes.

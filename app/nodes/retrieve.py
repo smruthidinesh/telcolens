@@ -13,7 +13,8 @@ def retrieve(state: AgentState) -> AgentState:
         return {"documents": store.score_all(question), "retrieval": "full-context"}
 
     queries = state.get("sub_queries") or [question]
-    k = state.get("k", config.TOP_K)
+    # fetch a larger candidate pool; the rerank node trims it down to TOP_K
+    k = max(state.get("k", config.TOP_K), config.RERANK_CANDIDATES)
 
     seen, docs = set(), []
     for q in queries:

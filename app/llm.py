@@ -41,16 +41,18 @@ def _complete_extractive(question: str, context: List[Dict[str, Any]]) -> Tuple[
         # weight by the doc's retrieval score so answers stay grounded in the
         # best-ranked context rather than any chunk that shares a keyword
         weight = 1.0 + doc.get("score", 0.0)
+        cite = doc.get("n")
         for sent in re.split(r"(?<=[.!?])\s+", doc["text"]):
             overlap = len(q_terms & set(re.findall(r"[a-z0-9]+", sent.lower())))
             if overlap:
-                scored.append((overlap * weight, sent.strip(), doc["source"]))
+                scored.append((overlap * weight, sent.strip(), cite))
     scored.sort(key=lambda x: -x[0])
     top = scored[:3]
     if not top:
         answer = "No grounded evidence was found in the indexed documents for this question."
     else:
-        answer = " ".join(s for _, s, _ in top)
+        # inline citations: append [n] to each cited sentence
+        answer = " ".join(f"{s} [{n}]" if n else s for _, s, n in top)
     usage = {
         "tokens_in": _estimate_tokens(question + " ".join(d["text"] for d in context)),
         "tokens_out": _estimate_tokens(answer),

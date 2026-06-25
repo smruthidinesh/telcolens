@@ -19,6 +19,10 @@ grounded answers, and **evaluates every answer for faithfulness and cost**.
 
 - **Hybrid retrieval** — dense (semantic) + BM25 (lexical) search fused with **Reciprocal Rank
   Fusion**, so exact terms (names, figures) and meaning are both caught. See `app/vector_store.py`.
+- **Reranking** — a larger candidate pool is re-scored (query-term coverage + phrase match) and
+  trimmed to the best few; swappable for a neural cross-encoder. See `app/nodes/rerank.py`.
+- **Inline citations** — answers cite their sources as `[1] [2]`, mapped to a numbered source list,
+  so every claim is traceable. See `app/nodes/generate.py`.
 - **Agentic routing** — queries are triaged into `simple` (single retrieval) vs `complex`
   (decomposed into sub-queries with wider retrieval). See `app/nodes/route.py`.
 - **Relevance gate + retrieval loop** — weak retrieval triggers a widen-and-retry edge

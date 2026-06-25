@@ -15,6 +15,7 @@ LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
 
 EMBED_DIM = 384
 TOP_K = 4
+RERANK_CANDIDATES = 12  # retrieve a larger pool, then rerank down to TOP_K
 MAX_RETRIEVAL_RETRIES = 1
 RELEVANCE_THRESHOLD = 0.15
 # if the whole indexed corpus fits this budget, skip retrieval and pass the full

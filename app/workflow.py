@@ -3,6 +3,7 @@ from langgraph.graph import StateGraph, START, END
 from .state import AgentState
 from .nodes.route import route
 from .nodes.retrieve import retrieve
+from .nodes.rerank import rerank_node
 from .nodes.grade import grade
 from .nodes.generate import generate
 from .nodes.evaluate import evaluate
@@ -14,6 +15,7 @@ def build_graph():
 
     g.add_node("route", route)
     g.add_node("retrieve", retrieve)
+    g.add_node("rerank", rerank_node)
     g.add_node("grade", grade)
     g.add_node("expand", expand)
     g.add_node("generate", generate)
@@ -21,7 +23,8 @@ def build_graph():
 
     g.add_edge(START, "route")
     g.add_edge("route", "retrieve")
-    g.add_edge("retrieve", "grade")
+    g.add_edge("retrieve", "rerank")
+    g.add_edge("rerank", "grade")
     g.add_conditional_edges("grade", after_grade, {"expand": "expand", "generate": "generate"})
     g.add_edge("expand", "retrieve")
     g.add_edge("generate", "evaluate")

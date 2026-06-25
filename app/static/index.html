@@ -162,7 +162,7 @@ function answerCard(m) {
   const subs = m.complexity === "complex"
     ? `<div class="text-[11px] text-slate-500 mt-1">${(m.sub_queries||[]).map(s=>"• "+esc(s)).join("<br/>")}</div>` : "";
   const sources = (m.sources||[]).map(s =>
-    `<div class="flex justify-between text-[11px]"><span class="text-slate-400">${esc(s.source)}</span><span class="text-slate-600">${esc(s.score)}</span></div>`).join("");
+    `<div class="flex justify-between text-[11px]"><span class="text-slate-400">${s.n!=null?`<span class="text-teal-300">[${esc(s.n)}]</span> `:""}${esc(s.source)}</span><span class="text-slate-600">${esc(s.score)}</span></div>`).join("");
   const retr = m.retrieval ? ` · <span class="text-teal-300">${esc(m.retrieval)}</span>` : "";
   return `
     <div class="text-[11px] text-slate-500 mb-2">routing: ${routing}${retr}${subs}</div>

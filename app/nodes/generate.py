@@ -2,24 +2,27 @@ from ..state import AgentState
 from .. import llm
 
 
-_PROMPT = """You are a telecom/SaaS financial analyst. Answer the question using ONLY the context.
-Cite figures exactly. If the context lacks the answer, say so.
+_PROMPT = """You are a document analyst. Answer the question using ONLY the numbered context.
+Cite the source number in square brackets after each claim that uses it, e.g. [1] or [2].
+Quote figures exactly. If the context lacks the answer, say so.
 
 Question: {question}
 
 Context:
 {context}
 
-Answer:"""
+Answer (with [n] citations):"""
 
 
 def generate(state: AgentState) -> AgentState:
     docs = state.get("documents", [])
-    context = "\n\n".join(f"[{d['source']}] {d['text']}" for d in docs)
+    # number each chunk so the answer can cite it inline as [n]
+    numbered = [{**d, "n": i + 1} for i, d in enumerate(docs)]
+    context = "\n\n".join(f"[{d['n']}] (source: {d['source']}) {d['text']}" for d in numbered)
     prompt = _PROMPT.format(question=state["question"], context=context)
 
-    answer, usage = llm.complete(prompt, docs)
-    sources = [{"source": d["source"], "score": round(d["score"], 3)} for d in docs]
+    answer, usage = llm.complete(prompt, numbered)
+    sources = [{"n": d["n"], "source": d["source"], "score": round(d["score"], 3)} for d in numbered]
     cost = {
         "tokens_in": usage["tokens_in"],
         "tokens_out": usage["tokens_out"],

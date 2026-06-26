@@ -6,6 +6,7 @@
 <title>TelcoLens — Agentic RAG Analyst</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <style>
   body { background:#0a0e16; }
   .card { background:#111726; border:1px solid #1e2940; }
@@ -13,6 +14,7 @@
   .cite { color:#5eead4; cursor:help; font-weight:600; }
   .cite:hover { text-decoration:underline; }
   .trace-row { border-left:2px solid #28344e; }
+  mark.hl { background:#facc15; color:#0b0f17; border-radius:2px; padding:0 2px; }
   .scroll::-webkit-scrollbar { width:8px; }
   .scroll::-webkit-scrollbar-thumb { background:#28344e; border-radius:8px; }
   .step.active { color:#a5b4fc; border-color:#6366f1; }
@@ -91,6 +93,20 @@
   </aside>
 </div>
 
+<!-- Source document viewer (click a [n] citation) -->
+<div id="docModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+  <div class="card rounded-2xl w-[880px] max-w-[95vw] h-[88vh] flex flex-col">
+    <div class="flex items-center justify-between p-4 border-b border-[#1e2940]">
+      <div id="docTitle" class="text-sm font-medium text-white truncate">Source</div>
+      <button id="closeDoc" class="text-slate-400 hover:text-white text-sm">✕</button>
+    </div>
+    <div class="px-4 py-2 border-b border-[#1e2940] text-[11px] text-slate-400">
+      Cited passage: <span id="docPassage" class="text-amber-200"></span>
+    </div>
+    <div id="docBody" class="flex-1 overflow-y-auto scroll bg-[#0b0f17] p-4"></div>
+  </div>
+</div>
+
 <!-- Charts modal -->
 <div id="chartsModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
   <div class="card rounded-2xl p-6 w-[640px] max-w-[94vw]">
@@ -157,12 +173,81 @@ function badge(label, val, good) {
   return `<span class="pill rounded-md px-2 py-1 text-[11px]">${label} <span class="${color} font-semibold">${val}</span></span>`;
 }
 
-// turn [n] markers into hover-to-see-source citation chips (the glass-box trust feature)
+// turn [n] markers into clickable citation chips (hover = preview, click = open source doc)
 function citeAnswer(answer, sources) {
   const map = {};
-  (sources||[]).forEach(s => { if (s.n!=null) map[s.n] = s.text || s.source; });
-  return esc(answer).replace(/\[(\d+)\]/g, (mm, n) =>
-    map[n] ? `<span class="cite" title="Source [${n}]: ${esc(map[n])}">[${n}]</span>` : mm);
+  (sources||[]).forEach(s => { if (s.n!=null) map[s.n] = s; });
+  return esc(answer).replace(/\[(\d+)\]/g, (mm, n) => {
+    const s = map[n]; if (!s) return mm;
+    return `<span class="cite" data-n="${n}" data-src="${esc(s.source||"")}" data-passage="${esc(s.text||"")}" title="Source [${n}]: ${esc(s.text||s.source)}">[${n}]</span>`;
+  });
+}
+
+// ---- Source document viewer: render the real file and highlight the cited passage ----
+async function openSource(src, passage) {
+  if (!src) return;
+  $("#docTitle").textContent = src;
+  $("#docPassage").textContent = passage ? (passage.length > 180 ? passage.slice(0, 180) + "…" : passage) : "";
+  $("#docBody").innerHTML = `<div class="text-slate-500 text-sm">Loading…</div>`;
+  $("#docModal").classList.remove("hidden");
+  const ext = (src.split(".").pop() || "").toLowerCase();
+  const url = "/file?source=" + encodeURIComponent(src);
+  try {
+    if (ext === "pdf") await renderPdf(url, passage);
+    else await renderText(url, passage);
+  } catch (e) {
+    $("#docBody").innerHTML = `<div class="text-rose-300 text-sm">Couldn't load the original file — the cited passage is shown above.</div>`;
+  }
+}
+
+async function renderText(url, passage) {
+  const txt = await (await fetch(url)).text();
+  let html = esc(txt);
+  const probe = esc((passage || "").slice(0, 90));
+  if (probe) {
+    const at = html.indexOf(probe);
+    if (at >= 0) html = html.slice(0, at) + '<mark class="hl">' + html.slice(at, at + probe.length) + "</mark>" + html.slice(at + probe.length);
+  }
+  $("#docBody").innerHTML = `<pre class="whitespace-pre-wrap text-sm text-slate-200 leading-relaxed">${html}</pre>`;
+  $("#docBody").querySelector("mark.hl")?.scrollIntoView({ block: "center" });
+}
+
+async function renderPdf(url, passage) {
+  if (!window.pdfjsLib) throw new Error("pdf.js not loaded");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+  const pdf = await pdfjsLib.getDocument(url).promise;
+  $("#docBody").innerHTML = "";
+  const pkey = (passage || "").toLowerCase();
+  let firstHl = null;
+  const maxPages = Math.min(pdf.numPages, 15);
+  for (let p = 1; p <= maxPages; p++) {
+    const page = await pdf.getPage(p);
+    const scale = 1.3;
+    const viewport = page.getViewport({ scale });
+    const wrap = document.createElement("div");
+    wrap.style.cssText = `position:relative;margin:0 auto 16px;width:${viewport.width}px`;
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    canvas.style.cssText = "display:block;border-radius:4px";
+    wrap.appendChild(canvas);
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    if (pkey) {
+      const tc = await page.getTextContent();
+      for (const item of tc.items) {
+        const t = (item.str || "").trim().toLowerCase();
+        if (t.length >= 4 && pkey.includes(t)) {
+          const [x, y] = viewport.convertToViewportPoint(item.transform[4], item.transform[5]);
+          const h = (item.height || 10) * scale, w = (item.width || 0) * scale;
+          const hl = document.createElement("div");
+          hl.style.cssText = `position:absolute;left:${x}px;top:${y - h}px;width:${w}px;height:${h}px;background:rgba(250,204,21,0.4);border-radius:2px`;
+          wrap.appendChild(hl);
+          if (!firstHl) firstHl = hl;
+        }
+      }
+    }
+    $("#docBody").appendChild(wrap);
+  }
+  if (firstHl) firstHl.scrollIntoView({ block: "center" });
 }
 
 // live "how this answer was made" trace — the agent's actual steps + data
@@ -206,6 +291,12 @@ function answerCard(m) {
     <details class="text-slate-500 mt-2"><summary class="text-[11px] cursor-pointer">sources · click [n] in the answer or expand here (${(m.sources||[]).length})</summary><div class="mt-1 space-y-1">${sources}</div></details>`;
 }
 
+function insightCard(m) {
+  return `<div class="card rounded-xl p-4 max-w-[88%] border-l-2 border-teal-500/60">
+    <div class="text-[11px] text-teal-300 mb-2">📌 Auto-insights · ${esc(m.source)}</div>
+    <ul class="text-sm text-slate-200 space-y-1 list-disc pl-5">${(m.items||[]).map(i=>`<li>${esc(i)}</li>`).join("")}</ul></div>`;
+}
+
 function renderMessages() {
   const c = current();
   $("#convoTitle").textContent = c?.title || "New chat";
@@ -213,9 +304,12 @@ function renderMessages() {
     $("#messages").innerHTML = `<div class="text-center text-slate-600 text-sm mt-20">Ask a question to begin.</div>`;
     return;
   }
-  $("#messages").innerHTML = c.messages.map(m => m.role === "user"
-    ? `<div class="flex justify-end"><div class="bg-indigo-500/20 border border-indigo-500/30 rounded-xl px-4 py-2 text-sm max-w-[80%]">${esc(m.text)}</div></div>`
-    : `<div class="card rounded-xl p-4 max-w-[88%]">${answerCard(m)}</div>`).join("");
+  $("#messages").innerHTML = c.messages.map(m =>
+    m.role === "user"
+      ? `<div class="flex justify-end"><div class="bg-indigo-500/20 border border-indigo-500/30 rounded-xl px-4 py-2 text-sm max-w-[80%]">${esc(m.text)}</div></div>`
+      : m.insight
+        ? insightCard(m)
+        : `<div class="card rounded-xl p-4 max-w-[88%]">${answerCard(m)}</div>`).join("");
   $("#messages").scrollTop = $("#messages").scrollHeight;
 }
 
@@ -245,6 +339,15 @@ async function uploadFile(file) {
     const d = await (await fetch("/ingest", { method:"POST", body: fd })).json();
     $("#uploadMsg").innerHTML = `<span class="text-emerald-400">✓ ${esc(d.filename)}: +${esc(d.ingested_chunks)} chunks</span>`;
     loadDocs(); loadStatus(); loadSuggestions();
+    // proactive: surface key findings the moment a doc is uploaded
+    if (!current()) newChat();
+    try {
+      const ins = await (await fetch("/insights?source=" + encodeURIComponent(d.filename))).json();
+      if (ins.insights && ins.insights.length) {
+        current().messages.push({ role:"assistant", insight:true, source:d.filename, items:ins.insights });
+        save(); renderMessages();
+      }
+    } catch {}
   } catch (e) { $("#uploadMsg").innerHTML = `<span class="text-rose-300">upload failed</span>`; }
 }
 
@@ -346,6 +449,12 @@ async function drawChart(metric) {
 }
 
 // wiring
+$("#closeDoc").onclick = () => $("#docModal").classList.add("hidden");
+$("#docModal").onclick = (e) => { if (e.target.id === "docModal") $("#docModal").classList.add("hidden"); };
+$("#messages").addEventListener("click", (e) => {
+  const c = e.target.closest(".cite");
+  if (c) openSource(c.dataset.src, c.dataset.passage);
+});
 $("#openCharts").onclick = openCharts;
 $("#closeCharts").onclick = () => $("#chartsModal").classList.add("hidden");
 $("#chartsModal").onclick = (e) => { if (e.target.id === "chartsModal") $("#chartsModal").classList.add("hidden"); };

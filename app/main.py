@@ -3,7 +3,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel
 
-from . import config, observability, metrics, suggest, charts
+from . import config, observability, metrics, suggest, charts, insights as doc_insights
 from .vector_store import store
 from .ingestion import ingest_bytes, list_sources
 from .workflow import graph
@@ -11,6 +11,7 @@ from .workflow import graph
 app = FastAPI(title="TelcoLens", description="Agentic RAG analyst for telecom/SaaS earnings & churn")
 
 _STATIC = os.path.join(os.path.dirname(__file__), "static")
+_UPLOADS = os.path.join(config.DATA_DIR, "uploads")
 
 
 class Query(BaseModel):
@@ -52,6 +53,11 @@ def suggestions():
     return {"suggestions": suggest.build()}
 
 
+@app.get("/insights")
+def insights(source: str):
+    return {"source": source, "insights": doc_insights.generate(source)}
+
+
 @app.get("/chart/metrics")
 def chart_metrics():
     return {"metrics": charts.available()}
@@ -83,7 +89,19 @@ async def ingest(file: UploadFile = File(...)):
     if len(raw) > MAX_UPLOAD_BYTES:
         raise HTTPException(413, "file too large (max 10 MB)")
     added = ingest_bytes(file.filename, raw)
+    # keep the original so the UI can render it for source highlighting
+    os.makedirs(_UPLOADS, exist_ok=True)
+    with open(os.path.join(_UPLOADS, os.path.basename(file.filename)), "wb") as f:
+        f.write(raw)
     return {"filename": file.filename, "ingested_chunks": added, "total": store.size}
+
+
+@app.get("/file")
+def get_file(source: str):
+    path = os.path.join(_UPLOADS, os.path.basename(source))  # basename blocks path traversal
+    if not os.path.exists(path):
+        raise HTTPException(404, "original file not available")
+    return FileResponse(path)
 
 
 @app.get("/metrics")

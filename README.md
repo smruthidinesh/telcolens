@@ -21,8 +21,12 @@ grounded answers, and **evaluates every answer for faithfulness and cost**.
   Fusion**, so exact terms (names, figures) and meaning are both caught. See `app/vector_store.py`.
 - **Reranking** — a larger candidate pool is re-scored (query-term coverage + phrase match) and
   trimmed to the best few; swappable for a neural cross-encoder. See `app/nodes/rerank.py`.
-- **Inline citations** — answers cite their sources as `[1] [2]`, mapped to a numbered source list,
-  so every claim is traceable. See `app/nodes/generate.py`.
+- **Inline citations + source highlighting** — answers cite sources as `[1] [2]`; click one to open
+  the original document and see the cited passage **highlighted in place** (pdf.js). `app/nodes/generate.py`.
+- **Glass-box trace** — every answer shows the agent's real steps (route → retrieve → rerank → grade →
+  generate → evaluate) with the candidate scores. The reasoning is made visible, not hidden.
+- **Proactive auto-insights** — on upload, the agent surfaces key findings + an anomaly unprompted.
+  `app/insights.py`.
 - **Agentic routing** — queries are triaged into `simple` (single retrieval) vs `complex`
   (decomposed into sub-queries with wider retrieval). See `app/nodes/route.py`.
 - **Relevance gate + retrieval loop** — weak retrieval triggers a widen-and-retry edge

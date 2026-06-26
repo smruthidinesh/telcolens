@@ -79,6 +79,19 @@ def _complete_openai(prompt: str) -> Tuple[str, Dict[str, Any]]:
     return answer, usage
 
 
+def raw_complete(prompt: str):
+    """One-shot completion returning just text (for insights, etc.). Uses the
+    configured provider; returns None when no live provider is available."""
+    try:
+        if config.GROQ_API_KEY:
+            return _complete_groq(prompt)[0]
+        if config.live_llm_enabled():
+            return _complete_openai(prompt)[0]
+    except Exception as e:
+        _log.warning("raw_complete provider failed: %s", e)
+    return None
+
+
 def _complete_groq(prompt: str) -> Tuple[str, Dict[str, Any]]:
     # Groq exposes an OpenAI-compatible API, so we reuse the OpenAI SDK with its base_url.
     from openai import OpenAI

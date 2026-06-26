@@ -10,6 +10,9 @@
   body { background:#0a0e16; }
   .card { background:#111726; border:1px solid #1e2940; }
   .pill { background:#161f33; border:1px solid #28344e; }
+  .cite { color:#5eead4; cursor:help; font-weight:600; }
+  .cite:hover { text-decoration:underline; }
+  .trace-row { border-left:2px solid #28344e; }
   .scroll::-webkit-scrollbar { width:8px; }
   .scroll::-webkit-scrollbar-thumb { background:#28344e; border-radius:8px; }
   .step.active { color:#a5b4fc; border-color:#6366f1; }
@@ -154,6 +157,27 @@ function badge(label, val, good) {
   return `<span class="pill rounded-md px-2 py-1 text-[11px]">${label} <span class="${color} font-semibold">${val}</span></span>`;
 }
 
+// turn [n] markers into hover-to-see-source citation chips (the glass-box trust feature)
+function citeAnswer(answer, sources) {
+  const map = {};
+  (sources||[]).forEach(s => { if (s.n!=null) map[s.n] = s.text || s.source; });
+  return esc(answer).replace(/\[(\d+)\]/g, (mm, n) =>
+    map[n] ? `<span class="cite" title="Source [${n}]: ${esc(map[n])}">[${n}]</span>` : mm);
+}
+
+// live "how this answer was made" trace — the agent's actual steps + data
+function renderTrace(trace) {
+  if (!trace || !trace.length) return "";
+  const rows = trace.map(s => {
+    const items = (s.items||[]).length
+      ? `<div class="mt-1 space-y-0.5">${s.items.slice(0,5).map(i =>
+          `<div class="flex justify-between"><span class="text-slate-500 truncate max-w-[70%]">${esc(i.source||"")}</span><span class="text-slate-600">${esc(i.score)}</span></div>`).join("")}</div>` : "";
+    return `<div class="trace-row pl-2 py-0.5"><span class="text-teal-300">${esc(s.label)}</span> <span class="text-slate-500">${esc(s.info)}</span>${items}</div>`;
+  }).join("");
+  return `<details class="mt-2"><summary class="text-[11px] cursor-pointer text-teal-300">🔍 how this answer was made · ${trace.length} steps</summary>
+    <div class="mt-2 space-y-1 text-[11px]">${rows}</div></details>`;
+}
+
 function answerCard(m) {
   const ev = m.evaluation || {}, c = m.cost || {};
   const routing = m.complexity === "complex"
@@ -162,11 +186,11 @@ function answerCard(m) {
   const subs = m.complexity === "complex"
     ? `<div class="text-[11px] text-slate-500 mt-1">${(m.sub_queries||[]).map(s=>"• "+esc(s)).join("<br/>")}</div>` : "";
   const sources = (m.sources||[]).map(s =>
-    `<div class="flex justify-between text-[11px]"><span class="text-slate-400">${s.n!=null?`<span class="text-teal-300">[${esc(s.n)}]</span> `:""}${esc(s.source)}</span><span class="text-slate-600">${esc(s.score)}</span></div>`).join("");
+    `<details class="text-[11px]"><summary class="cursor-pointer flex justify-between"><span class="text-slate-400">${s.n!=null?`<span class="text-teal-300">[${esc(s.n)}]</span> `:""}${esc(s.source)}</span><span class="text-slate-600">${esc(s.score)}</span></summary><div class="text-slate-500 mt-1 mb-1 pl-2 border-l border-[#28344e]">${esc(s.text||"")}</div></details>`).join("");
   const retr = m.retrieval ? ` · <span class="text-teal-300">${esc(m.retrieval)}</span>` : "";
   return `
     <div class="text-[11px] text-slate-500 mb-2">routing: ${routing}${retr}${subs}</div>
-    <div class="text-slate-100 leading-relaxed mb-3 text-sm">${m.answer ? esc(m.answer) : "—"}</div>
+    <div class="text-slate-100 leading-relaxed mb-3 text-sm">${m.answer ? citeAnswer(m.answer, m.sources) : "—"}</div>
     <div class="flex flex-wrap gap-2 mb-2">
       ${badge("faithfulness", ev.faithfulness, (ev.faithfulness||0)>=0.7)}
       ${badge("hallucination", ev.hallucination_risk, (ev.hallucination_risk||0)<=0.3)}
@@ -178,7 +202,8 @@ function answerCard(m) {
       <span class="pill rounded-md px-2 py-1 text-[11px]">${c.latency_ms ?? 0}ms</span>
       <span class="pill rounded-md px-2 py-1 text-[11px] text-slate-500">${esc(ev.method||"")}</span>
     </div>
-    <details class="text-slate-500 mt-2"><summary class="text-[11px] cursor-pointer">sources (${(m.sources||[]).length})</summary><div class="mt-1 space-y-1">${sources}</div></details>`;
+    ${renderTrace(m.trace)}
+    <details class="text-slate-500 mt-2"><summary class="text-[11px] cursor-pointer">sources · click [n] in the answer or expand here (${(m.sources||[]).length})</summary><div class="mt-1 space-y-1">${sources}</div></details>`;
 }
 
 function renderMessages() {

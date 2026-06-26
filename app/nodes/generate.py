@@ -22,7 +22,12 @@ def generate(state: AgentState) -> AgentState:
     prompt = _PROMPT.format(question=state["question"], context=context)
 
     answer, usage = llm.complete(prompt, numbered)
-    sources = [{"n": d["n"], "source": d["source"], "score": round(d["score"], 3)} for d in numbered]
+    sources = [{
+        "n": d["n"],
+        "source": d["source"],
+        "score": round(d["score"], 3),
+        "text": d["text"][:500],  # passage shown when a [n] citation is clicked
+    } for d in numbered]
     cost = {
         "tokens_in": usage["tokens_in"],
         "tokens_out": usage["tokens_out"],

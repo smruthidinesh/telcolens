@@ -369,6 +369,9 @@ async function send() {
   const q = $("#q").value.trim(); if (!q) return;
   if (!current()) newChat();
   const c = current();
+  // conversational memory: send the last few turns so follow-ups resolve
+  const history = c.messages.filter(m => !m.insight).slice(-6)
+    .map(m => ({ role: m.role, content: m.role === "user" ? m.text : (m.answer || "") }));
   c.messages.push({ role:"user", text:q });
   if (c.title === "New chat") c.title = q.slice(0, 38);
   $("#q").value = ""; save(); renderAll();
@@ -378,7 +381,7 @@ async function send() {
   const ctrl = new AbortController();
   const timeout = setTimeout(() => ctrl.abort(), 90000);  // never hang the button
   try {
-    const r = await fetch("/query", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({question:q}), signal: ctrl.signal });
+    const r = await fetch("/query", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({question:q, history}), signal: ctrl.signal });
     const d = await r.json();
     c.messages.push({ role:"assistant", ...d });
     save(); renderMessages();

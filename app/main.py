@@ -3,7 +3,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel
 
-from . import config, observability, metrics, suggest, charts, insights as doc_insights
+from . import config, observability, metrics, suggest, charts, memory, insights as doc_insights
 from .vector_store import store
 from .ingestion import ingest_bytes, list_sources
 from .workflow import graph
@@ -16,6 +16,7 @@ _UPLOADS = os.path.join(config.DATA_DIR, "uploads")
 
 class Query(BaseModel):
     question: str
+    history: list = []  # prior turns: [{"role": "user"|"assistant", "content": "..."}]
 
 
 @app.on_event("startup")
@@ -143,10 +144,15 @@ def _trace_step(node: str, delta: dict) -> dict:
 
 @app.post("/query")
 def query(q: Query):
-    with observability.trace("telcolens-query", q.question) as m:
-        final, steps = {"question": q.question}, []
+    # conversational memory: resolve a follow-up into a standalone question
+    standalone, rewritten = memory.contextualize(q.question, q.history)
+    with observability.trace("telcolens-query", standalone) as m:
+        final, steps = {"question": standalone}, []
+        if rewritten:
+            steps.append({"step": "contextualize", "label": "Contextualize",
+                          "info": f'follow-up → "{standalone[:90]}"'})
         # stream the graph so we capture every step's decision (glass-box trace)
-        for update in graph.stream({"question": q.question}, stream_mode="updates"):
+        for update in graph.stream({"question": standalone}, stream_mode="updates"):
             for node, delta in update.items():
                 final.update(delta or {})
                 steps.append(_trace_step(node, delta))
@@ -158,6 +164,7 @@ def query(q: Query):
         })
     response = {
         "question": q.question,
+        "rewritten_question": standalone if rewritten else None,
         "complexity": final.get("complexity"),
         "retrieval": final.get("retrieval"),
         "sub_queries": final.get("sub_queries"),

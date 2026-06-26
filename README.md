@@ -10,7 +10,21 @@ telecom/SaaS earnings and operational documents (revenue, ARPU, churn, NRR, FCF)
 **LangGraph** state machine that routes queries, retrieves and grades evidence, generates
 grounded answers, and **evaluates every answer for faithfulness and cost**.
 
+**▶ Live demo:** https://telcolens.onrender.com  ·  free tier, first load may take ~30s to wake.
+
 ![TelcoLens UI](docs/screenshot.png)
+
+### Highlights
+Upload a document → ask in plain English → get a **grounded, cited** answer, with the agent's
+reasoning shown step-by-step and every claim **clickable back to the source passage**.
+
+- **Production retrieval:** hybrid dense + BM25 + RRF, with a reranking stage (not naive vector-only).
+- **Adaptive:** long-context for whole small docs, hybrid RAG for large corpora.
+- **Trustworthy:** inline `[n]` citations + source highlighting, plus per-answer faithfulness scoring.
+- **Glass-box:** a live trace of every step (route → retrieve → rerank → grade → generate → evaluate).
+- **Production discipline:** offline eval harness as a **CI quality gate**, cost/latency monitoring,
+  Docker, tests, free **Groq** live mode (or fully offline demo mode).
+- **Conversational + proactive:** remembers follow-ups; surfaces key insights on upload, unprompted.
 
 > Designed to run **offline in demo mode** (no API keys) and scale to a live LLM pipeline by
 > setting credentials. The agentic graph runs identically in both modes.
@@ -29,6 +43,8 @@ grounded answers, and **evaluates every answer for faithfulness and cost**.
   `app/insights.py`.
 - **Agentic routing** — queries are triaged into `simple` (single retrieval) vs `complex`
   (decomposed into sub-queries with wider retrieval). See `app/nodes/route.py`.
+- **Conversational memory** — follow-ups ("and the prior year?") are rewritten into standalone
+  questions using the chat history before retrieval. See `app/memory.py`.
 - **Relevance gate + retrieval loop** — weak retrieval triggers a widen-and-retry edge
   (`app/edges/decisions.py`) instead of answering on thin context.
 - **Built-in evaluation** — every answer is scored for **faithfulness / hallucination risk**

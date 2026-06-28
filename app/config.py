@@ -14,10 +14,14 @@ LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY", "")
 LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
 
 EMBED_DIM = 384
-TOP_K = 4
-RERANK_CANDIDATES = 12  # retrieve a larger pool, then rerank down to TOP_K
+TOP_K = 6                # keep enough chunks for multi-fact / comparison answers
+RERANK_CANDIDATES = 15   # retrieve a larger pool, then rerank down to TOP_K
 MAX_RETRIEVAL_RETRIES = 1
-RELEVANCE_THRESHOLD = 0.15
+RELEVANCE_THRESHOLD = 0.15   # floor for cosine / rule-based rerank scores
+# Cohere cross-encoder scores sit on a different scale (top hit ~1.0, secondary
+# useful chunks can be ~0.04). Use a low floor so the grade gate only rejects when
+# NOTHING is relevant, and otherwise trusts the reranker's top-k ordering.
+COHERE_RELEVANCE_FLOOR = 0.08
 
 # Semantic chunking: pack sentences up to CHUNK_SIZE chars with CHUNK_OVERLAP
 # carried over (~17%, within the recommended 10-20% band) to avoid splitting a

@@ -139,7 +139,12 @@ def _trace_step(node: str, delta: dict) -> dict:
         return {"step": "generate", "label": "Generate", "info": f"mode {(delta.get('cost') or {}).get('mode', '?')}"}
     if node == "reflect":
         v = delta.get("verification") or {}
-        verdict = "supported ✓" if v.get("supported") else "unsupported — regenerating"
+        if v.get("supported"):
+            verdict = "supported ✓"
+        elif delta.get("regenerate"):
+            verdict = "unsupported — regenerating"
+        else:
+            verdict = "unsupported — accepted (retries exhausted)"
         return {"step": "reflect", "label": "Reflect", "info": f"{verdict} ({v.get('method', '?')})"}
     if node == "evaluate":
         ev = delta.get("evaluation") or {}

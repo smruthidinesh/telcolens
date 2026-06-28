@@ -3,8 +3,9 @@ from .. import llm
 
 
 _PROMPT = """You are a document analyst. Answer the question using ONLY the numbered context.
-Cite the source number in square brackets after each claim that uses it, e.g. [1] or [2].
-Quote figures exactly. If the context lacks the answer, say so.
+After each claim, cite the SINGLE most relevant source in square brackets, e.g. [2] — do
+not list several sources for the same fact. Quote figures exactly. If the context lacks
+the answer, say so.
 
 Question: {question}
 

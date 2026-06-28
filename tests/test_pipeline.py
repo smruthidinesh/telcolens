@@ -7,6 +7,7 @@ import pytest
 
 from app.nodes.route import classify
 from app.nodes.reflect import reflect
+from app.nodes.grade import grade
 from app.ingestion import _chunk_blocks, ingest_text, ingest_sample_dir
 from app.parsing import text_blocks
 from app.vector_store import store
@@ -65,6 +66,16 @@ def test_incremental_indexing_skips_unchanged_and_reembeds_only_changed():
     store.records.clear()
     store._invalidate()
     store.save()
+
+
+def test_grade_keeps_secondary_facts_under_cohere():
+    # Cohere scores drop steeply; the gate must keep secondary chunks (not prune to 1)
+    docs = [{"text": "guidance", "score": 0.99}, {"text": "more", "score": 0.4}, {"text": "risks", "score": 0.02}]
+    out = grade({"documents": docs, "retrieval": "hybrid", "rerank_method": "cohere"})
+    assert len(out["documents"]) == 3 and out["relevant"] is True
+    # but when nothing is relevant, it must still flag weak (refusal path)
+    weak = grade({"documents": [{"text": "x", "score": 0.05}], "retrieval": "hybrid", "rerank_method": "cohere"})
+    assert weak["relevant"] is False
 
 
 def test_reflect_flags_unsupported_answer():

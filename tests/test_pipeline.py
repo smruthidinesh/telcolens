@@ -6,7 +6,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pytest
 
 from app.nodes.route import classify
-from app.ingestion import _chunk, ingest_sample_dir
+from app.nodes.reflect import reflect
+from app.ingestion import _chunk_blocks, ingest_text, ingest_sample_dir
+from app.parsing import text_blocks
 from app.vector_store import store
 from app.workflow import graph
 
@@ -38,9 +40,40 @@ def test_routing_complex_decomposes():
 
 
 def test_chunking_overlap():
-    chunks = _chunk("word " * 400)
+    chunks = _chunk_blocks(text_blocks(("word " * 400).strip()))
     assert len(chunks) > 1
-    assert all(c.strip() for c in chunks)
+    assert all(c["text"].strip() for c in chunks)
+
+
+def test_semantic_chunking_tracks_section():
+    md = "# Revenue\nAurora revenue grew 14%.\n\n# Churn\nChurn fell to 1.8%."
+    chunks = _chunk_blocks(text_blocks(md))
+    sections = {c["metadata"].get("section") for c in chunks}
+    assert {"Revenue", "Churn"} <= sections
+
+
+def test_incremental_indexing_skips_unchanged_and_reembeds_only_changed():
+    store.records.clear()
+    store._invalidate()
+    md = "# A\nAurora revenue was 1200 million dollars this quarter.\n\n# B\nChurn fell to 1.8 percent overall."
+    first = ingest_text(md, "doc.md")
+    assert first > 0
+    assert ingest_text(md, "doc.md") == 0          # unchanged → no re-embedding
+    edited = md.replace("1.8 percent", "1.5 percent")
+    reembedded = ingest_text(edited, "doc.md")
+    assert 0 < reembedded < len(store.records)      # only the changed chunk re-embedded
+    store.records.clear()
+    store._invalidate()
+    store.save()
+
+
+def test_reflect_flags_unsupported_answer():
+    docs = [{"text": "Aurora revenue was $1,200M, up 14% YoY."}]
+    out = reflect({"answer": "The company filed for bankruptcy.", "documents": docs, "gen_retries": 0})
+    assert out["regenerate"] is True
+    # with the retry budget spent, it must stop (no infinite loop)
+    assert reflect({"answer": "The company filed for bankruptcy.", "documents": docs,
+                    "gen_retries": 1})["regenerate"] is False
 
 
 def test_pipeline_end_to_end(sample_index):

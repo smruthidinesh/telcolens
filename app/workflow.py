@@ -6,8 +6,9 @@ from .nodes.retrieve import retrieve
 from .nodes.rerank import rerank_node
 from .nodes.grade import grade
 from .nodes.generate import generate
+from .nodes.reflect import reflect
 from .nodes.evaluate import evaluate
-from .edges.decisions import after_grade, expand
+from .edges.decisions import after_grade, expand, after_reflect
 
 
 def build_graph():
@@ -19,6 +20,7 @@ def build_graph():
     g.add_node("grade", grade)
     g.add_node("expand", expand)
     g.add_node("generate", generate)
+    g.add_node("reflect", reflect)
     g.add_node("evaluate", evaluate)
 
     g.add_edge(START, "route")
@@ -27,7 +29,8 @@ def build_graph():
     g.add_edge("rerank", "grade")
     g.add_conditional_edges("grade", after_grade, {"expand": "expand", "generate": "generate"})
     g.add_edge("expand", "retrieve")
-    g.add_edge("generate", "evaluate")
+    g.add_edge("generate", "reflect")
+    g.add_conditional_edges("reflect", after_reflect, {"generate": "generate", "evaluate": "evaluate"})
     g.add_edge("evaluate", END)
 
     return g.compile()

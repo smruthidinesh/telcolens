@@ -18,6 +18,25 @@ TOP_K = 4
 RERANK_CANDIDATES = 12  # retrieve a larger pool, then rerank down to TOP_K
 MAX_RETRIEVAL_RETRIES = 1
 RELEVANCE_THRESHOLD = 0.15
+
+# Semantic chunking: pack sentences up to CHUNK_SIZE chars with CHUNK_OVERLAP
+# carried over (~17%, within the recommended 10-20% band) to avoid splitting a
+# vital sentence across two chunks.
+CHUNK_SIZE = 900
+CHUNK_OVERLAP = 150
+
+# Cross-encoder reranking via Cohere Rerank (hosted, no local GPU/torch). When
+# COHERE_API_KEY is unset, the rule-based reranker is used as a fallback.
+COHERE_API_KEY = os.getenv("COHERE_API_KEY", "")
+COHERE_RERANK_MODEL = os.getenv("TELCOLENS_RERANK_MODEL", "rerank-english-v3.0")
+
+# Self-reflection: after generating, verify the answer's claims against the
+# retrieved context; if unsupported, regenerate once under a stricter prompt.
+MAX_GEN_RETRIES = 1
+GROUNDING_MIN = 0.35  # demo-mode proxy threshold for "answer is grounded"
+
+# OCR: rasterize + read scanned/image PDF pages when they yield too little text.
+OCR_MIN_CHARS = 40  # a page with fewer extracted chars is treated as scanned/image
 # if the whole indexed corpus fits this budget, skip retrieval and pass the full
 # text to the LLM (long-context mode, like ChatGPT); above it, use hybrid RAG.
 FULL_CONTEXT_CHARS = 48000  # ~12k tokens

@@ -39,6 +39,41 @@ class VectorStore:
             self.records.append(c)
         self._invalidate()
 
+    def upsert_source(self, source: str, new_records: List[Dict[str, Any]], doc_hash: str) -> int:
+        """Incremental indexing for one document (Doc 6 in the RAG notes).
+
+        - Unchanged document (same SHA-256 doc_hash) → no work, returns 0.
+        - Otherwise diff by per-chunk content hash: reuse the existing embedding
+          for unchanged chunks (no recompute), embed only new/changed chunks, and
+          drop removed ones. Avoids rebuilding the whole index on every edit and
+          keeps the vector store in sync with the document, not the filename.
+        Returns the number of chunks actually (re-)embedded."""
+        existing = [r for r in self.records if r.get("source") == source]
+        if existing and all(r.get("metadata", {}).get("doc_hash") == doc_hash for r in existing):
+            return 0  # document unchanged — nothing to do
+
+        old_by_hash = {r.get("metadata", {}).get("chunk_hash"): r for r in existing}
+        rebuilt, reembedded = [], 0
+        for nr in new_records:
+            ch = nr["metadata"]["chunk_hash"]
+            prev = old_by_hash.get(ch)
+            if prev is not None:
+                nr["vector"] = prev["vector"]  # unchanged chunk — reuse embedding
+            else:
+                nr["vector"] = embeddings.embed(nr["text"]).tolist()
+                reembedded += 1
+            rebuilt.append(nr)
+
+        self.records = [r for r in self.records if r.get("source") != source] + rebuilt
+        self._invalidate()
+        return reembedded
+
+    def remove_source(self, source: str) -> int:
+        before = len(self.records)
+        self.records = [r for r in self.records if r.get("source") != source]
+        self._invalidate()
+        return before - len(self.records)
+
     def _invalidate(self):
         self._matrix = None
         self._bm25 = None

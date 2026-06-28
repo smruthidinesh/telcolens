@@ -1,55 +1,93 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import re
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
-from . import config
+from . import config, parsing
 from .vector_store import store
 
-
-def _chunk(text: str, size: int = 700, overlap: int = 120) -> List[str]:
-    text = re.sub(r"\s+", " ", text).strip()
-    chunks, start = [], 0
-    while start < len(text):
-        end = start + size
-        chunks.append(text[start:end])
-        start = end - overlap
-    return [c for c in chunks if c.strip()]
+_SENT = re.compile(r"(?<=[.!?])\s+")
 
 
-def _read(path: str) -> str:
-    if path.lower().endswith(".pdf"):
-        from pypdf import PdfReader
-        return "\n".join((p.extract_text() or "") for p in PdfReader(path).pages)
-    with open(path, encoding="utf-8", errors="ignore") as f:
-        return f.read()
+def _sha(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8", "ignore")).hexdigest()
+
+
+def _sentences(text: str) -> List[str]:
+    return [s.strip() for s in _SENT.split(text) if s.strip()]
+
+
+def _chunk_blocks(
+    blocks: List[Dict[str, Any]], size: int | None = None, overlap: int | None = None
+) -> List[Dict[str, Any]]:
+    """Semantic chunking: pack whole sentences (never split mid-sentence) up to
+    `size` chars with `overlap` carried over, and never merge across a block —
+    so a chunk stays within one section/page. Tables are kept intact as their
+    own chunk so rows/headers aren't fragmented. Each chunk keeps page/section
+    metadata for precise citations."""
+    size = size or config.CHUNK_SIZE
+    overlap = overlap or config.CHUNK_OVERLAP
+    chunks: List[Dict[str, Any]] = []
+    for b in blocks:
+        meta = {"page": b.get("page"), "section": b.get("section"), "kind": b.get("kind", "text")}
+        if b.get("kind") == "table":
+            chunks.append({"text": b["text"], "metadata": meta})  # keep structure intact
+            continue
+        # units = sentences, with any single oversized sentence hard-split so no
+        # chunk can blow past `size`.
+        units: List[str] = []
+        for sent in _sentences(b["text"]) or [b["text"]]:
+            while len(sent) > size:
+                units.append(sent[:size])
+                sent = sent[size - overlap:]
+            if sent.strip():
+                units.append(sent)
+
+        cur = ""
+        for unit in units:
+            if cur and len(cur) + len(unit) + 1 > size:
+                chunks.append({"text": cur.strip(), "metadata": meta})
+                cur = (cur[-overlap:] + " " + unit).strip() if overlap else unit
+            else:
+                cur = (cur + " " + unit).strip()
+        if cur.strip():
+            chunks.append({"text": cur.strip(), "metadata": meta})
+    return [c for c in chunks if c["text"].strip()]
+
+
+def index_blocks(
+    blocks: List[Dict[str, Any]], source: str, metadata: Dict[str, Any] | None = None
+) -> int:
+    """Chunk + content-hash + incrementally upsert one document. Returns the
+    number of chunks (re-)embedded (0 if the document was unchanged)."""
+    doc_hash = _sha("".join(b["text"] for b in blocks))
+    records = []
+    for i, c in enumerate(_chunk_blocks(blocks)):
+        meta = {**(metadata or {}), **c["metadata"], "doc_hash": doc_hash, "chunk_hash": _sha(c["text"])}
+        records.append({
+            "id": f"{source}::chunk_{i:04d}",   # stable, human-readable chunk id
+            "text": c["text"],
+            "source": source,
+            "metadata": meta,
+        })
+    return store.upsert_source(source, records, doc_hash)
 
 
 def ingest_text(text: str, source: str, metadata: Dict[str, Any] | None = None) -> int:
-    base = len(store.records)
-    chunks = [
-        {"id": f"{source}-{i}", "text": c, "source": source, "metadata": metadata or {}}
-        for i, c in enumerate(_chunk(text))
-    ]
-    store.add(chunks)
-    store.save()
-    return len(store.records) - base
-
-
-def ingest_path(path: str, metadata: Dict[str, Any] | None = None) -> int:
-    return ingest_text(_read(path), os.path.basename(path), metadata)
+    return index_blocks(parsing.text_blocks(text), source, metadata)
 
 
 def ingest_bytes(filename: str, data: bytes, metadata: Dict[str, Any] | None = None) -> int:
-    if filename.lower().endswith(".pdf"):
-        from io import BytesIO
-        from pypdf import PdfReader
-        text = "\n".join((p.extract_text() or "") for p in PdfReader(BytesIO(data)).pages)
-    else:
-        text = data.decode("utf-8", errors="ignore")
+    blocks = parsing.extract_blocks(filename, data)
     meta = metadata or ({"company": filename.split("_")[0]} if "_" in filename else {})
-    return ingest_text(text, filename, meta)
+    return index_blocks(blocks, filename, meta)
+
+
+def ingest_path(path: str, metadata: Dict[str, Any] | None = None) -> int:
+    with open(path, "rb") as f:
+        return ingest_bytes(os.path.basename(path), f.read(), metadata)
 
 
 def list_sources() -> List[Dict[str, Any]]:

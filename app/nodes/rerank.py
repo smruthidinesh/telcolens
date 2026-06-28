@@ -1,7 +1,9 @@
+import logging
 import re
 from ..state import AgentState
 from .. import config
 
+_log = logging.getLogger("telcolens")
 _TOKEN = re.compile(r"[a-z0-9]+")
 _STOP = {
     "the", "a", "an", "and", "or", "of", "to", "in", "for", "on", "with", "was",
@@ -27,14 +29,45 @@ def _relevance(q_terms, q_bigrams, text: str) -> float:
     return round(0.7 * coverage + 0.3 * phrase, 4)
 
 
+def _rerank_cohere(query: str, docs, k: int):
+    """Neural cross-encoder reranking via the Cohere Rerank API (hosted — no
+    local GPU/torch). A cross-encoder jointly encodes the query+document, which
+    is far more accurate than the bi-encoder cosine used at retrieval time."""
+    import httpx
+
+    resp = httpx.post(
+        "https://api.cohere.com/v2/rerank",
+        headers={"Authorization": f"Bearer {config.COHERE_API_KEY}"},
+        json={
+            "model": config.COHERE_RERANK_MODEL,
+            "query": query,
+            "documents": [d["text"] for d in docs],
+            "top_n": min(k, len(docs)),
+        },
+        timeout=20.0,
+    )
+    resp.raise_for_status()
+    out = []
+    for r in resp.json()["results"]:
+        d = docs[r["index"]]
+        out.append({**d, "score": round(float(r["relevance_score"]), 3)})
+    return out
+
+
 def rerank(query: str, docs, k: int):
-    """Cross-encoder-style reranking: re-score each query-document pair with a
-    stronger relevance signal (query-term coverage + phrase match) than the
-    initial retrieval used, then keep the top-k. A neural cross-encoder or a
-    hosted reranker (Cohere/Jina) can be swapped in behind this same interface.
-    """
+    """Reorder retrieved candidates and keep the top-k. Uses a real cross-encoder
+    (Cohere Rerank) when COHERE_API_KEY is set; otherwise a rule-based reranker
+    (query-term coverage + phrase match) — a stronger signal than the retrieval
+    cosine, with zero dependencies for the free demo."""
     if not docs:
         return docs
+
+    if config.COHERE_API_KEY:
+        try:
+            return _rerank_cohere(query, docs, k)
+        except Exception as e:  # degrade to the rule-based reranker, never hard-fail
+            _log.warning("Cohere rerank failed (%s); using rule-based fallback", e)
+
     qt = _terms(query)
     qb = _bigrams(qt)
     scored = sorted(((_relevance(qt, qb, d["text"]), d) for d in docs), key=lambda x: -x[0])

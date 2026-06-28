@@ -21,7 +21,7 @@ reasoning shown step-by-step and every claim **clickable back to the source pass
 - **Production retrieval:** hybrid dense + BM25 + RRF, with a reranking stage (not naive vector-only).
 - **Adaptive:** long-context for whole small docs, hybrid RAG for large corpora.
 - **Trustworthy:** inline `[n]` citations + source highlighting, plus per-answer faithfulness scoring.
-- **Glass-box:** a live trace of every step (route → retrieve → rerank → grade → generate → evaluate).
+- **Glass-box:** a live trace of every step (route → retrieve → rerank → grade → generate → reflect → evaluate).
 - **Production discipline:** offline eval harness as a **CI quality gate**, cost/latency monitoring,
   Docker, tests, free **Groq** live mode (or fully offline demo mode).
 - **Conversational + proactive:** remembers follow-ups; surfaces key insights on upload, unprompted.
@@ -33,12 +33,24 @@ reasoning shown step-by-step and every claim **clickable back to the source pass
 
 - **Hybrid retrieval** — dense (semantic) + BM25 (lexical) search fused with **Reciprocal Rank
   Fusion**, so exact terms (names, figures) and meaning are both caught. See `app/vector_store.py`.
-- **Reranking** — a larger candidate pool is re-scored (query-term coverage + phrase match) and
-  trimmed to the best few; swappable for a neural cross-encoder. See `app/nodes/rerank.py`.
+- **Cross-encoder reranking** — a larger candidate pool is re-scored by a **neural cross-encoder
+  (Cohere Rerank)** when `COHERE_API_KEY` is set, with a rule-based reranker (query-term coverage +
+  phrase match) as a zero-dependency fallback. See `app/nodes/rerank.py`.
+- **Semantic chunking + page-aware citations** — documents are split on sentence/paragraph/heading
+  boundaries (not blind character counts), and each chunk keeps its **page number and section** so
+  citations point to the exact page. See `app/parsing.py`, `app/ingestion.py`.
+- **Self-reflection / verification loop** — after generating, a critic checks every claim against the
+  retrieved evidence (LLM fact-check live, grounding proxy in demo); an unsupported answer triggers
+  one stricter regeneration. Guards the "retrieved but still hallucinated" failure. `app/nodes/reflect.py`.
+- **Multi-modal PDF parsing** — extracts body text **plus tables (structure preserved)** and runs
+  **OCR on scanned/image pages** (PyMuPDF + Tesseract), degrading gracefully when OCR is unavailable.
+- **Incremental indexing** — documents are SHA-256 content-hashed with stable chunk IDs; re-ingesting
+  re-embeds **only changed chunks** (unchanged skipped, removed deleted) instead of rebuilding the
+  index. See `app/vector_store.py` `upsert_source`.
 - **Inline citations + source highlighting** — answers cite sources as `[1] [2]`; click one to open
   the original document and see the cited passage **highlighted in place** (pdf.js). `app/nodes/generate.py`.
 - **Glass-box trace** — every answer shows the agent's real steps (route → retrieve → rerank → grade →
-  generate → evaluate) with the candidate scores. The reasoning is made visible, not hidden.
+  generate → reflect → evaluate) with the candidate scores. The reasoning is made visible, not hidden.
 - **Proactive auto-insights** — on upload, the agent surfaces key findings + an anomaly unprompted.
   `app/insights.py`.
 - **Agentic routing** — queries are triaged into `simple` (single retrieval) vs `complex`
@@ -77,8 +89,9 @@ pytest -q                           # run tests
 ## Architecture
 
 ```
-START → route → retrieve → grade ─┬─(weak)→ expand → retrieve   (loop, capped)
-                                  └─(ok)→ generate → evaluate → END
+START → route → retrieve → rerank → grade ─┬─(weak)→ expand → retrieve   (loop, capped)
+                                           └─(ok)→ generate → reflect ─┬─(unsupported)→ generate  (stricter, capped)
+                                                                       └─(ok)→ evaluate → END
 ```
 
 ## Run it (demo mode, no keys)
@@ -139,9 +152,11 @@ This is a single-user demo, hardened for the threats that matter at that scope:
 app/
 ├── workflow.py      # LangGraph graph assembly
 ├── state.py         # shared agent state
-├── nodes/           # route · retrieve · grade · generate · evaluate
-├── edges/           # conditional retrieval-expansion logic
-├── vector_store.py  # local cosine store (→ pgvector/Qdrant in prod)
+├── nodes/           # route · retrieve · rerank · grade · generate · reflect · evaluate
+├── edges/           # conditional retrieval-expansion + reflect-regenerate logic
+├── parsing.py       # PDF text + tables + OCR, structure-aware blocks
+├── ingestion.py     # semantic chunking + incremental (hash-diff) indexing
+├── vector_store.py  # hybrid dense+BM25 store, upsert_source (→ pgvector/Qdrant in prod)
 ├── llm.py           # LLM provider + offline extractive fallback
 ├── embeddings.py    # hashed offline embeddings + OpenAI provider
 ├── observability.py # Langfuse + local cost metrics

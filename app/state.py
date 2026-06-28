@@ -12,5 +12,8 @@ class AgentState(TypedDict, total=False):
     relevant: bool
     answer: str
     sources: List[Dict[str, Any]]
+    verification: Dict[str, Any]      # supported, detail, method (self-reflection)
+    regenerate: bool                  # critic asked for a stricter regeneration
+    gen_retries: int
     evaluation: Dict[str, Any]        # faithfulness, relevance, grounded
     cost: Dict[str, Any]              # tokens_in, tokens_out, usd, latency_ms

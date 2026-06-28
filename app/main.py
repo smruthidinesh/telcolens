@@ -136,6 +136,10 @@ def _trace_step(node: str, delta: dict) -> dict:
         return {"step": "expand", "label": "Expand", "info": "widened search, retrying"}
     if node == "generate":
         return {"step": "generate", "label": "Generate", "info": f"mode {(delta.get('cost') or {}).get('mode', '?')}"}
+    if node == "reflect":
+        v = delta.get("verification") or {}
+        verdict = "supported ✓" if v.get("supported") else "unsupported — regenerating"
+        return {"step": "reflect", "label": "Reflect", "info": f"{verdict} ({v.get('method', '?')})"}
     if node == "evaluate":
         ev = delta.get("evaluation") or {}
         return {"step": "evaluate", "label": "Evaluate", "info": f"faithfulness {ev.get('faithfulness', '?')}"}
@@ -170,6 +174,7 @@ def query(q: Query):
         "sub_queries": final.get("sub_queries"),
         "answer": final.get("answer"),
         "sources": final.get("sources"),
+        "verification": final.get("verification"),
         "evaluation": final.get("evaluation"),
         "trace": steps,
         "cost": {**final.get("cost", {}), "latency_ms": m["latency_ms"]},

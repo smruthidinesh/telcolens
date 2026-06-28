@@ -8,6 +8,13 @@ langgraph==0.2.39
 langchain-core==0.3.15
 pypdf==5.1.0
 
+# multi-modal PDF parsing: PyMuPDF (text + tables + page rasterization, no system
+# deps) and Tesseract OCR for scanned/image pages (needs the tesseract-ocr binary,
+# installed in the Dockerfile). OCR degrades gracefully if the binary is absent.
+pymupdf==1.24.10
+pytesseract==0.3.13
+Pillow==10.4.0
+
 # used for Groq (OpenAI-compatible API) and OpenAI live mode
 openai==1.54.0
 httpx==0.27.2  # openai 1.54 is incompatible with httpx>=0.28 (proxies arg removed)

@@ -58,13 +58,13 @@ def rerank(query: str, docs, k: int):
     """Reorder retrieved candidates and keep the top-k. Uses a real cross-encoder
     (Cohere Rerank) when COHERE_API_KEY is set; otherwise a rule-based reranker
     (query-term coverage + phrase match) — a stronger signal than the retrieval
-    cosine, with zero dependencies for the free demo."""
+    cosine, with zero dependencies for the free demo. Returns (docs, method)."""
     if not docs:
-        return docs
+        return docs, "none"
 
     if config.COHERE_API_KEY:
         try:
-            return _rerank_cohere(query, docs, k)
+            return _rerank_cohere(query, docs, k), "cohere"
         except Exception as e:  # degrade to the rule-based reranker, never hard-fail
             _log.warning("Cohere rerank failed (%s); using rule-based fallback", e)
 
@@ -73,11 +73,12 @@ def rerank(query: str, docs, k: int):
     scored = sorted(((_relevance(qt, qb, d["text"]), d) for d in docs), key=lambda x: -x[0])
     # keep the reranker's score when it found signal; else fall back to the
     # retrieval score so the relevance gate still has something to work with.
-    return [{**d, "score": s if s > 0 else d.get("score", 0.0)} for s, d in scored[:k]]
+    return [{**d, "score": s if s > 0 else d.get("score", 0.0)} for s, d in scored[:k]], "rule-based"
 
 
 def rerank_node(state: AgentState) -> AgentState:
     docs = state.get("documents", [])
     if state.get("retrieval") == "full-context":
-        return {"documents": docs}  # long-context keeps the whole doc — no reranking
-    return {"documents": rerank(state["question"], docs, config.TOP_K)}
+        return {"documents": docs, "rerank_method": "skipped (full-context)"}
+    reranked, method = rerank(state["question"], docs, config.TOP_K)
+    return {"documents": reranked, "rerank_method": method}

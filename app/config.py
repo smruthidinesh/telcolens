@@ -39,7 +39,9 @@ GROUNDING_MIN = 0.35  # demo-mode proxy threshold for "answer is grounded"
 OCR_MIN_CHARS = 40  # a page with fewer extracted chars is treated as scanned/image
 # if the whole indexed corpus fits this budget, skip retrieval and pass the full
 # text to the LLM (long-context mode, like ChatGPT); above it, use hybrid RAG.
-FULL_CONTEXT_CHARS = 48000  # ~12k tokens
+# Kept deliberately modest: only a single small document takes the shortcut; any
+# multi-document or larger corpus exercises the real retrieval + rerank pipeline.
+FULL_CONTEXT_CHARS = 12000  # ~3k tokens
 
 DATA_DIR = os.getenv("TELCOLENS_DATA", os.path.join(os.path.dirname(__file__), "..", "data"))
 

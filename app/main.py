@@ -128,7 +128,8 @@ def _trace_step(node: str, delta: dict) -> dict:
         return {"step": "retrieve", "label": "Retrieve",
                 "info": f"{delta.get('retrieval', '?')} · {len(docs)} candidates", "items": items}
     if node == "rerank":
-        return {"step": "rerank", "label": "Rerank", "info": f"kept top {len(docs)}", "items": items}
+        method = delta.get("rerank_method", "?")
+        return {"step": "rerank", "label": "Rerank", "info": f"{method} · kept top {len(docs)}", "items": items}
     if node == "grade":
         return {"step": "grade", "label": "Grade",
                 "info": ("relevant ✓" if delta.get("relevant") else "weak — retrying") + f" · {len(docs)} kept"}

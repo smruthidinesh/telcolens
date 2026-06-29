@@ -12,7 +12,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     TELCOLENS_DEMO=1 \
     TELCOLENS_LOCAL_MODELS=1 \
     HF_HOME=/app/.hf_cache \
-    SENTENCE_TRANSFORMERS_HOME=/app/.hf_cache
+    SENTENCE_TRANSFORMERS_HOME=/app/.hf_cache \
+    TELCOLENS_DATA=/tmp/telcolens_data
+# (HF Spaces run as a non-root user; /tmp is writable for the in-memory index/uploads,
+#  and the baked model cache under /app is world-readable.)
 
 # tesseract — OCR engine for scanned/image PDF pages
 RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr \

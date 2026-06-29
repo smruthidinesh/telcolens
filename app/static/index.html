@@ -66,6 +66,11 @@
     <div class="px-5 pb-5">
       <div class="card rounded-xl p-3">
         <div id="examples" class="flex flex-wrap gap-2 text-[11px] mb-2"></div>
+        <div class="flex items-center justify-end mb-2 text-[11px] text-slate-400">
+          <label class="flex items-center gap-1 cursor-pointer" title="Reject empty / too-short queries (and 'no documents yet') before running the pipeline">
+            <input id="guardrails" type="checkbox" checked class="accent-indigo-500"/> 🛡️ Guardrails
+          </label>
+        </div>
         <div class="flex items-end gap-2">
           <textarea id="q" rows="1" class="flex-1 bg-transparent outline-none resize-none text-slate-100 placeholder:text-slate-500 text-sm"
             placeholder="Ask a question about your documents…  (Enter to send)"></textarea>
@@ -381,7 +386,8 @@ async function send() {
   const ctrl = new AbortController();
   const timeout = setTimeout(() => ctrl.abort(), 90000);  // never hang the button
   try {
-    const r = await fetch("/query", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({question:q, history}), signal: ctrl.signal });
+    const guardrails = $("#guardrails") ? $("#guardrails").checked : true;
+    const r = await fetch("/query", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({question:q, history, guardrails}), signal: ctrl.signal });
     const d = await r.json();
     c.messages.push({ role:"assistant", ...d });
     save(); renderMessages();
@@ -488,6 +494,13 @@ async function loadSuggestions() {
 
 if (!convos.length) newChat(); else renderAll();
 loadStatus(); loadDocs(); loadSuggestions();
+
+// guardrails toggle — restore + persist across sessions
+(function(){
+  const g = $("#guardrails"); if (!g) return;
+  g.checked = localStorage.getItem("telcolens_guardrails") !== "0";
+  g.addEventListener("change", () => localStorage.setItem("telcolens_guardrails", g.checked ? "1" : "0"));
+})();
 </script>
 </body>
 </html>

@@ -43,6 +43,10 @@ USE_LOCAL_MODELS = os.getenv("TELCOLENS_LOCAL_MODELS", "").lower() in ("1", "tru
 LOCAL_EMBED_MODEL = os.getenv("TELCOLENS_LOCAL_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 LOCAL_RERANK_MODEL = os.getenv("TELCOLENS_LOCAL_RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
 
+# Input guardrail at /query (reject empty / too-short / no-documents queries before
+# running the pipeline). On by default; set TELCOLENS_GUARDRAIL=0 to disable.
+GUARDRAIL_ENABLED = os.getenv("TELCOLENS_GUARDRAIL", "1").lower() in ("1", "true", "yes")
+
 # Self-reflection: after generating, verify the answer's claims against the
 # retrieved context; if unsupported, regenerate once under a stricter prompt.
 MAX_GEN_RETRIES = 1

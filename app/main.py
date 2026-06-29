@@ -1,4 +1,6 @@
 import os
+from typing import Optional
+
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel
@@ -17,6 +19,7 @@ _UPLOADS = os.path.join(config.DATA_DIR, "uploads")
 class Query(BaseModel):
     question: str
     history: list = []  # prior turns: [{"role": "user"|"assistant", "content": "..."}]
+    guardrails: Optional[bool] = None  # UI toggle; None => use the server default
 
 
 @app.on_event("startup")
@@ -152,9 +155,12 @@ def _trace_step(node: str, delta: dict) -> dict:
     return {"step": node, "label": node, "info": ""}
 
 
-def _guardrail(question):
+def _guardrail(question, enabled):
     """Input guardrail (production pattern): reject queries we shouldn't run the
-    full pipeline on. Returns a message to short-circuit with, or None to proceed."""
+    full pipeline on. Returns a message to short-circuit with, or None to proceed.
+    `enabled` comes from the UI toggle, falling back to TELCOLENS_GUARDRAIL."""
+    if not enabled:
+        return None
     q = (question or "").strip()
     if len(q) < 3 or len(q.split()) < 2:
         return "Please ask a full question about your uploaded document(s) — e.g. \"What was the revenue?\""
@@ -165,7 +171,8 @@ def _guardrail(question):
 
 @app.post("/query")
 def query(q: Query):
-    blocked = _guardrail(q.question)
+    guardrails_on = config.GUARDRAIL_ENABLED if q.guardrails is None else q.guardrails
+    blocked = _guardrail(q.question, guardrails_on)
     if blocked:
         return {"question": q.question, "answer": blocked, "sources": [],
                 "trace": [{"step": "guardrail", "label": "Guardrail", "info": "query rejected"}],

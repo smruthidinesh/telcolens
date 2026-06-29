@@ -19,7 +19,8 @@ _UPLOADS = os.path.join(config.DATA_DIR, "uploads")
 class Query(BaseModel):
     question: str
     history: list = []  # prior turns: [{"role": "user"|"assistant", "content": "..."}]
-    guardrails: Optional[bool] = None  # UI toggle; None => use the server default
+    guardrails: Optional[bool] = None   # UI toggle; None => server default
+    off_topic: Optional[bool] = None     # UI toggle: "only answer about uploaded docs"
 
 
 @app.on_event("startup")
@@ -155,10 +156,11 @@ def _trace_step(node: str, delta: dict) -> dict:
     return {"step": node, "label": node, "info": ""}
 
 
-def _guardrail(question, enabled):
+def _guardrail(question, enabled, off_topic=False):
     """Input guardrail (production pattern): reject queries we shouldn't run the
     full pipeline on. Returns a message to short-circuit with, or None to proceed.
-    `enabled` comes from the UI toggle, falling back to TELCOLENS_GUARDRAIL."""
+    `enabled` is the master toggle; `off_topic` adds a semantic domain check that
+    rejects questions unrelated to the uploaded documents (uses local embeddings)."""
     if not enabled:
         return None
     q = (question or "").strip()
@@ -166,13 +168,20 @@ def _guardrail(question, enabled):
         return "Please ask a full question about your uploaded document(s) — e.g. \"What was the revenue?\""
     if store.size == 0:
         return "No documents are indexed yet. Upload a PDF / .txt / .md on the right, then ask a question."
+    if off_topic:
+        hits = store.search(q, 3)
+        top = max((h.get("score", 0.0) for h in hits), default=0.0)
+        if top < config.OFFTOPIC_THRESHOLD:
+            return ("That question doesn't look related to the uploaded document(s). "
+                    "Try asking about their contents — a figure, a section, or a comparison.")
     return None
 
 
 @app.post("/query")
 def query(q: Query):
     guardrails_on = config.GUARDRAIL_ENABLED if q.guardrails is None else q.guardrails
-    blocked = _guardrail(q.question, guardrails_on)
+    offtopic_on = config.OFFTOPIC_GUARD if q.off_topic is None else q.off_topic
+    blocked = _guardrail(q.question, guardrails_on, off_topic=(guardrails_on and offtopic_on))
     if blocked:
         return {"question": q.question, "answer": blocked, "sources": [],
                 "trace": [{"step": "guardrail", "label": "Guardrail", "info": "query rejected"}],

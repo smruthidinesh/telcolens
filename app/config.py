@@ -46,6 +46,11 @@ LOCAL_RERANK_MODEL = os.getenv("TELCOLENS_LOCAL_RERANK_MODEL", "cross-encoder/ms
 # Input guardrail at /query (reject empty / too-short / no-documents queries before
 # running the pipeline). On by default; set TELCOLENS_GUARDRAIL=0 to disable.
 GUARDRAIL_ENABLED = os.getenv("TELCOLENS_GUARDRAIL", "1").lower() in ("1", "true", "yes")
+# Semantic off-topic guard: reject questions unrelated to the uploaded documents,
+# measured with the local embeddings (no API). Opt-in (UI toggle / env). The
+# threshold is the minimum query↔corpus similarity to be considered on-topic.
+OFFTOPIC_GUARD = os.getenv("TELCOLENS_OFFTOPIC_GUARD", "").lower() in ("1", "true", "yes")
+OFFTOPIC_THRESHOLD = float(os.getenv("TELCOLENS_OFFTOPIC_THRESHOLD", "0.08"))
 
 # Self-reflection: after generating, verify the answer's claims against the
 # retrieved context; if unsupported, regenerate once under a stricter prompt.

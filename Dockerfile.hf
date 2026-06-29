@@ -11,6 +11,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     TELCOLENS_DEMO=1 \
     TELCOLENS_LOCAL_MODELS=1 \
+    TELCOLENS_GROQ_MODEL=llama-3.1-8b-instant \
     HF_HOME=/app/.hf_cache \
     SENTENCE_TRANSFORMERS_HOME=/app/.hf_cache \
     TELCOLENS_DATA=/tmp/telcolens_data

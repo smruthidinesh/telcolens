@@ -19,7 +19,9 @@ def grade(state: AgentState) -> AgentState:
     if state.get("retrieval") == "full-context":
         return {"documents": docs, "relevant": True}
 
+    # neural cross-encoders (Cohere or local) put relevance on a different scale than
+    # cosine — use a low floor and trust the reranker's top-k; rule-based uses cosine scale
     floor = (config.COHERE_RELEVANCE_FLOOR
-             if state.get("rerank_method") == "cohere" else config.RELEVANCE_THRESHOLD)
+             if state.get("rerank_method") in ("cohere", "local") else config.RELEVANCE_THRESHOLD)
     relevant = bool(docs) and docs[0]["score"] >= floor
     return {"documents": docs if relevant else docs[:1], "relevant": relevant}

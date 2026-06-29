@@ -152,8 +152,24 @@ def _trace_step(node: str, delta: dict) -> dict:
     return {"step": node, "label": node, "info": ""}
 
 
+def _guardrail(question):
+    """Input guardrail (production pattern): reject queries we shouldn't run the
+    full pipeline on. Returns a message to short-circuit with, or None to proceed."""
+    q = (question or "").strip()
+    if len(q) < 3 or len(q.split()) < 2:
+        return "Please ask a full question about your uploaded document(s) — e.g. \"What was the revenue?\""
+    if store.size == 0:
+        return "No documents are indexed yet. Upload a PDF / .txt / .md on the right, then ask a question."
+    return None
+
+
 @app.post("/query")
 def query(q: Query):
+    blocked = _guardrail(q.question)
+    if blocked:
+        return {"question": q.question, "answer": blocked, "sources": [],
+                "trace": [{"step": "guardrail", "label": "Guardrail", "info": "query rejected"}],
+                "evaluation": {}, "cost": {}}
     # conversational memory: resolve a follow-up into a standalone question
     standalone, rewritten = memory.contextualize(q.question, q.history)
     with observability.trace("telcolens-query", standalone) as m:

@@ -1,0 +1,6 @@
+# Local open-source models — for a resourceful host (HuggingFace Spaces, ~16GB RAM).
+# Enables fully self-hosted semantic embeddings (all-MiniLM-L6-v2) + a neural
+# cross-encoder reranker (ms-marco-MiniLM) with NO external API and NO rate limits.
+# Install alongside requirements.txt and set TELCOLENS_LOCAL_MODELS=1.
+# (torch is installed separately as the CPU build in Dockerfile.hf to keep the image small.)
+sentence-transformers>=2.7,<4

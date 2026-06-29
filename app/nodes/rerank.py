@@ -54,13 +54,42 @@ def _rerank_cohere(query: str, docs, k: int):
     return out
 
 
+_cross_encoder = None
+
+
+def _get_cross_encoder():
+    global _cross_encoder
+    if _cross_encoder is None:
+        from sentence_transformers import CrossEncoder
+        _cross_encoder = CrossEncoder(config.LOCAL_RERANK_MODEL)
+    return _cross_encoder
+
+
+def _rerank_local(query: str, docs, k: int):
+    """Local neural cross-encoder (sentence-transformers, e.g. ms-marco-MiniLM) —
+    runs on the host (no API, no rate limits). Raw scores are logits, so we squash
+    them with a sigmoid to a 0..1 range comparable to the Cohere scores the grade
+    gate expects."""
+    import math
+
+    scores = _get_cross_encoder().predict([(query, d["text"]) for d in docs])
+    ranked = sorted(zip(scores, docs), key=lambda x: -float(x[0]))[:k]
+    return [{**d, "score": round(1.0 / (1.0 + math.exp(-float(s))), 3)} for s, d in ranked]
+
+
 def rerank(query: str, docs, k: int):
-    """Reorder retrieved candidates and keep the top-k. Uses a real cross-encoder
-    (Cohere Rerank) when COHERE_API_KEY is set; otherwise a rule-based reranker
-    (query-term coverage + phrase match) — a stronger signal than the retrieval
-    cosine, with zero dependencies for the free demo. Returns (docs, method)."""
+    """Reorder retrieved candidates and keep the top-k. Prefers a real cross-encoder
+    — local sentence-transformers when TELCOLENS_LOCAL_MODELS is on, else Cohere
+    Rerank when COHERE_API_KEY is set — and falls back to a rule-based reranker
+    (query-term coverage + phrase match) otherwise. Returns (docs, method)."""
     if not docs:
         return docs, "none"
+
+    if config.USE_LOCAL_MODELS:
+        try:
+            return _rerank_local(query, docs, k), "local"
+        except Exception as e:  # never hard-fail; fall through to the next reranker
+            _log.warning("Local rerank failed (%s); falling back", e)
 
     if config.COHERE_API_KEY:
         try:
@@ -80,5 +109,23 @@ def rerank_node(state: AgentState) -> AgentState:
     docs = state.get("documents", [])
     if state.get("retrieval") == "full-context":
         return {"documents": docs, "rerank_method": "skipped (full-context)"}
-    reranked, method = rerank(state["question"], docs, config.TOP_K)
+
+    subs = state.get("sub_queries") or [state["question"]]
+    if len(subs) > 1:
+        # Multi-part question: rerank against EACH sub-query and fuse, so every
+        # sub-question keeps its best evidence. Reranking a compound question
+        # ("compare X and Y on A and B") scores all chunks low and drops the
+        # secondary facts. With a local cross-encoder this costs nothing (no API).
+        per = max(3, config.TOP_K // len(subs))
+        picked: dict = {}
+        method = "rule-based"
+        for sq in subs:
+            reranked, method = rerank(sq, docs, per)
+            for d in reranked:
+                if d["id"] not in picked or d["score"] > picked[d["id"]]["score"]:
+                    picked[d["id"]] = d
+        fused = sorted(picked.values(), key=lambda d: -d["score"])[: config.TOP_K + 4]
+        return {"documents": fused, "rerank_method": method}
+
+    reranked, method = rerank(subs[0], docs, config.TOP_K)
     return {"documents": reranked, "rerank_method": method}

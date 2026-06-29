@@ -34,6 +34,15 @@ CHUNK_OVERLAP = 150
 COHERE_API_KEY = os.getenv("COHERE_API_KEY", "")
 COHERE_RERANK_MODEL = os.getenv("TELCOLENS_RERANK_MODEL", "rerank-english-v3.0")
 
+# Local open-source models (sentence-transformers) — for a resourceful host like
+# HuggingFace Spaces (~16GB RAM): fully self-hosted semantic embeddings + a neural
+# cross-encoder reranker, with NO external API and NO rate limits. Off by default
+# (won't fit a 512MB box); enable with TELCOLENS_LOCAL_MODELS=1.
+# all-MiniLM-L6-v2 outputs 384-dim, matching EMBED_DIM above.
+USE_LOCAL_MODELS = os.getenv("TELCOLENS_LOCAL_MODELS", "").lower() in ("1", "true", "yes")
+LOCAL_EMBED_MODEL = os.getenv("TELCOLENS_LOCAL_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+LOCAL_RERANK_MODEL = os.getenv("TELCOLENS_LOCAL_RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+
 # Self-reflection: after generating, verify the answer's claims against the
 # retrieved context; if unsupported, regenerate once under a stricter prompt.
 MAX_GEN_RETRIES = 1
